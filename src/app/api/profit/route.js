@@ -16,7 +16,7 @@ export async function GET(request) {
   const type = searchParams.get('type');
 
   if (type === 'transactions') {
-    if (auth.role === 'admin') return NextResponse.json(global.__transactions);
+    if (auth.role === 'admin' || auth.role === 'superadmin') return NextResponse.json(global.__transactions);
     return NextResponse.json(global.__transactions.filter(t => t.userId === auth.userId));
   }
 

@@ -15,7 +15,7 @@ export default function AdminPage() {
   useEffect(() => {
     const t = localStorage.getItem('ay_token');
     const r = localStorage.getItem('ay_role');
-    if (!t || r !== 'admin') { window.location.href = '/login'; return; }
+    if (!t || (r !== 'admin' && r !== 'superadmin')) { window.location.href = '/login'; return; }
     setToken(t);
   }, []);
 

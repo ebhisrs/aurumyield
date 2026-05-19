@@ -3,10 +3,30 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'aurumyield-dev-secret';
-const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-const ADMIN_PASS_HASH = bcrypt.hashSync(process.env.ADMIN_PASS || 'admin123', 10);
 
-// In-memory users store
+// In-memory admins store
+if (!global.__admins) {
+  global.__admins = [
+    { id: 1, username: 'superadmin', name: 'Super Administrator', password: bcrypt.hashSync(process.env.SUPER_PASS || 'super123', 10), role: 'superadmin', status: 'active', permissions: ['all'], createdAt: '2026-01-01' },
+    { id: 2, username: 'admin', name: 'Admin User', password: bcrypt.hashSync(process.env.ADMIN_PASS || 'admin123', 10), role: 'admin', status: 'active', permissions: ['approve_clients','approve_deposits','approve_withdrawals','post_profit'], createdAt: '2026-01-01' },
+  ];
+}
+
+if (!global.__settings) {
+  global.__settings = {
+    platformName: 'AurumYield',
+    minDeposit: 1000,
+    maxWithdrawalPercent: 100,
+    conservativeTarget: '4',
+    growthTarget: '8',
+    kycRequired: true,
+    autoApproveDeposits: false,
+    autoApproveWithdrawals: false,
+    maintenanceMode: false,
+    disclaimer: 'Target returns are investment objectives, not guarantees. Capital is at risk.',
+  };
+}
+
 if (!global.__users) {
   global.__users = [
     { id: 1, name: 'Ahmed Al-Rashid', email: 'ahmed@example.com', phone: '+971501234567', country: 'UAE', password: bcrypt.hashSync('client123', 10), role: 'client', status: 'approved', program: 'Conservative', profitPref: 'Monthly income withdrawals', balance: 12480, withdrawable: 1240, lockedCapital: 10000, lastProfit: '3.2%', createdAt: '2026-01-05' },
@@ -57,13 +77,15 @@ export async function POST(request) {
   try {
     const { email, password, loginType } = await request.json();
 
-    // Admin login
+    // Admin or Super Admin login
     if (loginType === 'admin') {
-      if (email !== ADMIN_USER || !bcrypt.compareSync(password, ADMIN_PASS_HASH)) {
+      const admin = global.__admins.find(a => a.username === email && a.status === 'active');
+      if (!admin || !bcrypt.compareSync(password, admin.password)) {
         return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
       }
-      const token = jwt.sign({ role: 'admin', username: ADMIN_USER }, JWT_SECRET, { expiresIn: '24h' });
-      return NextResponse.json({ token, role: 'admin', username: ADMIN_USER });
+      const token = jwt.sign({ role: admin.role, adminId: admin.id, username: admin.username, permissions: admin.permissions }, JWT_SECRET, { expiresIn: '24h' });
+      global.__audit.unshift({ action: `${admin.role === 'superadmin' ? 'Super Admin' : 'Admin'} logged in: ${admin.username}`, admin: admin.username, date: new Date().toISOString(), ip: '0.0.0.0' });
+      return NextResponse.json({ token, role: admin.role, username: admin.username, permissions: admin.permissions });
     }
 
     // Client login

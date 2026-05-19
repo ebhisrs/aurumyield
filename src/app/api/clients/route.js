@@ -8,7 +8,7 @@ function checkAdmin(request) {
   if (!auth?.startsWith('Bearer ')) return false;
   try {
     const decoded = jwt.verify(auth.slice(7), JWT_SECRET);
-    return decoded.role === 'admin';
+    return decoded.role === 'admin' || decoded.role === 'superadmin';
   } catch { return false; }
 }
 
@@ -18,7 +18,7 @@ function checkClient(request) {
   try {
     const decoded = jwt.verify(auth.slice(7), JWT_SECRET);
     if (decoded.role === 'client') return decoded;
-    if (decoded.role === 'admin') return { ...decoded, isAdmin: true };
+    if (decoded.role === 'admin' || decoded.role === 'superadmin') return { ...decoded, isAdmin: true };
     return null;
   } catch { return null; }
 }
