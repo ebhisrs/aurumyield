@@ -12,6 +12,8 @@ export default function DashboardPage() {
   const [msg, setMsg] = useState('');
   const [msgType, setMsgType] = useState('success');
   const [depForm, setDepForm] = useState({amount:'',currency:'USD',method:'Bank Transfer',program:'Conservative'});
+  const [depProof, setDepProof] = useState(null);
+  const [depProofName, setDepProofName] = useState('');
   const [wdForm, setWdForm] = useState({amount:'',source:'Available Profit Balance',method:'Bank Transfer',destination:''});
   const [reportFrom, setReportFrom] = useState('');
   const [reportTo, setReportTo] = useState('');
@@ -62,15 +64,28 @@ export default function DashboardPage() {
   const submitDeposit = async (e) => {
     e.preventDefault();
     try {
+      const payload = { ...depForm };
+      if (depProof) payload.proof = depProof;
       const res = await fetch('/api/deposits', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify(depForm),
+        body: JSON.stringify(payload),
       });
       const d = await res.json();
-      if (res.ok) { flash('Deposit request submitted! Ref: ' + (d.ref || '')); setDepForm({amount:'',currency:'USD',method:'Bank Transfer',program:'Conservative'}); load(); }
+      if (res.ok) { flash('Deposit request submitted! Ref: ' + (d.ref || '')); setDepForm({amount:'',currency:'USD',method:'Bank Transfer',program:'Conservative'}); setDepProof(null); setDepProofName(''); load(); }
       else flash(d.error || 'Error', 'error');
     } catch { flash('Network error', 'error'); }
+  };
+
+  const handleProofUpload = (file) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { flash('File too large. Max 5MB.', 'error'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDepProof(reader.result.split(',')[1]);
+      setDepProofName(file.name);
+    };
+    reader.readAsDataURL(file);
   };
 
   const submitWithdrawal = async (e) => {
@@ -313,7 +328,23 @@ export default function DashboardPage() {
               <div className="field"><label>Currency</label><select value={depForm.currency} onChange={e => setDepForm({...depForm,currency:e.target.value})}><option>USD</option><option>AED</option><option>EUR</option><option>GBP</option></select></div>
               <div className="field"><label>Method</label><select value={depForm.method} onChange={e => setDepForm({...depForm,method:e.target.value})}><option>Bank Transfer</option><option>Card Payment</option><option>USDT / Stablecoin</option></select></div>
               <div className="field"><label>Program</label><select value={depForm.program} onChange={e => setDepForm({...depForm,program:e.target.value})}><option>Conservative</option><option>Growth</option></select></div>
-              <div className="full"><button type="submit" className="btn btn-primary">Create Deposit Request</button></div>
+              <div className="field full">
+                <label>Payment Proof *</label>
+                <p className="muted" style={{fontSize:12,marginBottom:8}}>Upload screenshot or receipt of your payment (JPG, PNG, PDF — max 5MB)</p>
+                {depProofName ? (
+                  <div style={{display:'flex',alignItems:'center',gap:10,padding:12,border:'1px solid rgba(123,216,143,.3)',borderRadius:14,background:'rgba(123,216,143,.05)'}}>
+                    <span style={{color:'var(--green)',fontWeight:700}}>✓</span>
+                    <span style={{fontSize:13,flex:1}}>{depProofName}</span>
+                    <button type="button" onClick={() => { setDepProof(null); setDepProofName(''); }} style={{background:'none',border:'none',color:'var(--red)',cursor:'pointer',fontSize:16}}>✕</button>
+                  </div>
+                ) : (
+                  <label style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'20px 16px',border:'2px dashed var(--line)',borderRadius:16,cursor:'pointer',background:'rgba(217,164,65,.04)'}}>
+                    <span style={{color:'var(--gold2)',fontWeight:700,fontSize:14}}>Click to upload payment proof</span>
+                    <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{display:'none'}} onChange={e => { if (e.target.files[0]) handleProofUpload(e.target.files[0]); }} />
+                  </label>
+                )}
+              </div>
+              <div className="full"><button type="submit" className="btn btn-primary" disabled={!depProof}>Create Deposit Request</button></div>
             </form>
           </div>
         )}
@@ -324,10 +355,10 @@ export default function DashboardPage() {
             <div style={{marginBottom:18}}><span className="eyebrow">MY DEPOSITS</span><h2 style={{fontSize:22,fontWeight:800,marginTop:8}}>Deposit History</h2></div>
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Ref</th><th>Status</th></tr></thead>
+                <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Ref</th><th>Proof</th><th>Status</th></tr></thead>
                 <tbody>
                   {deposits.map(d => (
-                    <tr key={d.id}><td>{d.date}</td><td style={{fontWeight:700}}>{usd(d.amount)}</td><td>{d.method}</td><td>{d.ref}</td><td><span className={'tag ' + d.status}>{d.status}</span></td></tr>
+                    <tr key={d.id}><td>{d.date}</td><td style={{fontWeight:700}}>{usd(d.amount)}</td><td>{d.method}</td><td>{d.ref}</td><td>{d.hasProof ? <span className="tag approved" style={{fontSize:11}}>Attached</span> : <span className="muted" style={{fontSize:11}}>None</span>}</td><td><span className={'tag ' + d.status}>{d.status}</span></td></tr>
                   ))}
                 </tbody>
               </table>

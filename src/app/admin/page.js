@@ -15,6 +15,9 @@ export default function AdminPage() {
   const [viewDoc, setViewDoc] = useState(null);
   const [viewDocData, setViewDocData] = useState(null);
   const [loadingDoc, setLoadingDoc] = useState(false);
+  const [viewProof, setViewProof] = useState(null);
+  const [viewProofData, setViewProofData] = useState(null);
+  const [loadingProof, setLoadingProof] = useState(false);
 
   useEffect(() => {
     const t = localStorage.getItem('ay_token');
@@ -86,6 +89,20 @@ export default function AdminPage() {
       }
     } catch {}
     setLoadingDoc(false);
+  };
+
+  const openProof = async (deposit) => {
+    setViewProof(deposit);
+    setViewProofData(null);
+    setLoadingProof(true);
+    try {
+      const res = await fetch(`/api/deposits?depositId=${deposit.id}&proof=true`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setViewProofData(data.proof);
+      }
+    } catch {}
+    setLoadingProof(false);
   };
 
   const logout = () => { localStorage.clear(); window.location.href = '/login'; };
@@ -249,7 +266,7 @@ export default function AdminPage() {
             <div style={{marginBottom:18}}><span className="eyebrow">DEPOSITS</span><h2 style={{fontSize:22,fontWeight:800,marginTop:8}}>Deposit Requests</h2></div>
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Client</th><th>Amount</th><th>Method</th><th>Status</th><th>Ref</th><th>Date</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Client</th><th>Amount</th><th>Method</th><th>Proof</th><th>Status</th><th>Ref</th><th>Date</th><th>Actions</th></tr></thead>
                 <tbody>
                   {deposits.map(d => {
                     const client = clients.find(c => c.id === d.userId);
@@ -258,6 +275,7 @@ export default function AdminPage() {
                         <td>{client?.name || 'Unknown'}</td>
                         <td style={{fontWeight:700}}>{usd(d.amount)}</td>
                         <td>{d.method}</td>
+                        <td>{d.hasProof ? <button className="btn btn-small btn-secondary" onClick={() => openProof(d)}>View Proof</button> : <span className="muted" style={{fontSize:12}}>None</span>}</td>
                         <td><span className={`tag ${d.status}`}>{d.status}</span></td>
                         <td>{d.ref}</td>
                         <td>{d.date}</td>
@@ -374,6 +392,38 @@ export default function AdminPage() {
                 <div style={{display:'flex',gap:10}}>
                   <button className="btn btn-ok" onClick={() => kycAction(viewDoc.id, 'approve')}>Approve Document</button>
                   <button className="btn btn-danger" onClick={() => kycAction(viewDoc.id, 'reject')}>Reject Document</button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* VIEW PROOF MODAL */}
+        {viewProof && (
+          <div className="modal-overlay" onClick={() => { setViewProof(null); setViewProofData(null); }}>
+            <div className="modal-box" style={{maxWidth:800,maxHeight:'90vh',overflow:'auto'}} onClick={e => e.stopPropagation()}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:18}}>
+                <div>
+                  <h3 style={{fontSize:22,fontWeight:800}}>Payment Proof</h3>
+                  <p className="muted" style={{marginTop:4}}>Deposit {viewProof.ref} — {usd(viewProof.amount)} via {viewProof.method}</p>
+                </div>
+                <button className="btn btn-small btn-secondary" onClick={() => { setViewProof(null); setViewProofData(null); }}>Close</button>
+              </div>
+
+              {loadingProof && <div style={{textAlign:'center',padding:40}}><p className="muted">Loading proof...</p></div>}
+
+              {viewProofData && (
+                <div style={{borderRadius:16,overflow:'hidden',border:'1px solid var(--white)',marginBottom:18}}>
+                  <img src={`data:image/jpeg;base64,${viewProofData}`} style={{width:'100%',display:'block'}} alt="Payment Proof" onError={(e) => { e.target.style.display='none'; e.target.parentElement.innerHTML = '<iframe src="data:application/pdf;base64,' + viewProofData + '" style="width:100%;height:500px;border:0"></iframe>'; }} />
+                </div>
+              )}
+
+              {!loadingProof && !viewProofData && <div style={{textAlign:'center',padding:40}}><p className="muted">No proof available or failed to load.</p></div>}
+
+              {viewProof.status === 'pending' && (
+                <div style={{display:'flex',gap:10}}>
+                  <button className="btn btn-ok" onClick={() => { depositAction(viewProof.id, 'approve'); setViewProof(null); setViewProofData(null); }}>Approve Deposit</button>
+                  <button className="btn btn-danger" onClick={() => { depositAction(viewProof.id, 'reject'); setViewProof(null); setViewProofData(null); }}>Reject Deposit</button>
                 </div>
               )}
             </div>
