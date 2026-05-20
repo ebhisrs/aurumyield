@@ -1,27 +1,30 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
+import { initData } from '../lib/data.js';
+
 const JWT_SECRET = process.env.JWT_SECRET || 'aurumyield-dev-secret';
 
 function getAuth(request) {
   const auth = request.headers.get('authorization');
-  if (!auth?.startsWith('Bearer ')) return null;
+  if (!auth || !auth.startsWith('Bearer ')) return null;
   try { return jwt.verify(auth.slice(7), JWT_SECRET); } catch { return null; }
 }
 
 export async function GET(request) {
+  initData();
   const auth = getAuth(request);
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (auth.role === 'admin') return NextResponse.json(global.__withdrawals);
+  if (auth.role === 'admin' || auth.role === 'superadmin') return NextResponse.json(global.__withdrawals);
   return NextResponse.json(global.__withdrawals.filter(w => w.userId === auth.userId));
 }
 
 export async function POST(request) {
+  initData();
   const auth = getAuth(request);
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const data = await request.json();
 
-  // Admin approving/rejecting
-  if (auth.role === 'admin' && data.action) {
+  if ((auth.role === 'admin' || auth.role === 'superadmin') && data.action) {
     const w = global.__withdrawals.find(x => x.id === data.withdrawalId);
     if (!w) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const user = global.__users.find(u => u.id === w.userId);
@@ -33,16 +36,15 @@ export async function POST(request) {
       user.balance -= w.amount;
       user.withdrawable -= w.amount;
       const txId = Math.max(0, ...global.__transactions.map(t => t.id)) + 1;
-      global.__transactions.push({ id: txId, userId: user.id, type: 'withdrawal', desc: `Withdrawal approved`, amount: -w.amount, balanceBefore: user.balance + w.amount, balanceAfter: user.balance, status: 'Paid', date: new Date().toISOString().split('T')[0] });
-      global.__audit.unshift({ action: `Approved withdrawal for ${user.name}; -$${w.amount.toLocaleString()}`, admin: 'Admin', date: new Date().toISOString(), ip: '0.0.0.0' });
+      global.__transactions.push({ id: txId, userId: user.id, type: 'withdrawal', desc: 'Withdrawal approved', amount: -w.amount, balanceBefore: user.balance + w.amount, balanceAfter: user.balance, status: 'Paid', date: new Date().toISOString().split('T')[0] });
+      global.__audit.unshift({ action: `Approved withdrawal for ${user.name}; -$${w.amount.toLocaleString()}`, admin: auth.username || 'Admin', date: new Date().toISOString(), ip: '0.0.0.0' });
     } else if (data.action === 'reject') {
       w.status = 'rejected';
-      global.__audit.unshift({ action: `Rejected withdrawal for ${user?.name}`, admin: 'Admin', date: new Date().toISOString(), ip: '0.0.0.0' });
+      global.__audit.unshift({ action: `Rejected withdrawal for ${user?.name}`, admin: auth.username || 'Admin', date: new Date().toISOString(), ip: '0.0.0.0' });
     }
     return NextResponse.json({ ok: true });
   }
 
-  // Client creating withdrawal
   if (auth.role === 'client') {
     const user = global.__users.find(u => u.id === auth.userId);
     if (!user || user.status !== 'approved') return NextResponse.json({ error: 'Account not active' }, { status: 403 });

@@ -1,33 +1,21 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
+import { initData } from '../lib/data.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'aurumyield-dev-secret';
 
-function checkAdmin(request) {
+function getAuth(request) {
   const auth = request.headers.get('authorization');
-  if (!auth?.startsWith('Bearer ')) return false;
-  try {
-    const decoded = jwt.verify(auth.slice(7), JWT_SECRET);
-    return decoded.role === 'admin' || decoded.role === 'superadmin';
-  } catch { return false; }
-}
-
-function checkClient(request) {
-  const auth = request.headers.get('authorization');
-  if (!auth?.startsWith('Bearer ')) return null;
-  try {
-    const decoded = jwt.verify(auth.slice(7), JWT_SECRET);
-    if (decoded.role === 'client') return decoded;
-    if (decoded.role === 'admin' || decoded.role === 'superadmin') return { ...decoded, isAdmin: true };
-    return null;
-  } catch { return null; }
+  if (!auth || !auth.startsWith('Bearer ')) return null;
+  try { return jwt.verify(auth.slice(7), JWT_SECRET); } catch { return null; }
 }
 
 export async function GET(request) {
-  const auth = checkClient(request);
+  initData();
+  const auth = getAuth(request);
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  if (auth.isAdmin || auth.role === 'admin') {
+  if (auth.role === 'admin' || auth.role === 'superadmin') {
     const users = global.__users.map(({ password, ...u }) => u);
     return NextResponse.json(users);
   }
@@ -39,7 +27,9 @@ export async function GET(request) {
 }
 
 export async function PUT(request) {
-  if (!checkAdmin(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  initData();
+  const auth = getAuth(request);
+  if (!auth || (auth.role !== 'admin' && auth.role !== 'superadmin')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { userId, action } = await request.json();
   const user = global.__users.find(u => u.id === userId);
@@ -47,14 +37,13 @@ export async function PUT(request) {
 
   if (action === 'approve') {
     user.status = 'approved';
-    global.__audit.unshift({ action: `Approved client: ${user.name}`, admin: 'Admin', date: new Date().toISOString(), ip: '0.0.0.0' });
+    global.__audit.unshift({ action: `Approved client: ${user.name}`, admin: auth.username || 'Admin', date: new Date().toISOString(), ip: '0.0.0.0' });
   } else if (action === 'disable') {
     user.status = 'disabled';
-    global.__audit.unshift({ action: `Disabled client: ${user.name}`, admin: 'Admin', date: new Date().toISOString(), ip: '0.0.0.0' });
+    global.__audit.unshift({ action: `Disabled client: ${user.name}`, admin: auth.username || 'Admin', date: new Date().toISOString(), ip: '0.0.0.0' });
   } else if (action === 'enable') {
     user.status = 'approved';
-    global.__audit.unshift({ action: `Enabled client: ${user.name}`, admin: 'Admin', date: new Date().toISOString(), ip: '0.0.0.0' });
+    global.__audit.unshift({ action: `Enabled client: ${user.name}`, admin: auth.username || 'Admin', date: new Date().toISOString(), ip: '0.0.0.0' });
   }
-
   return NextResponse.json({ ok: true });
 }
