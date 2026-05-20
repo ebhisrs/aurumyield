@@ -10,11 +10,14 @@ export default function DashboardPage() {
   const [transactions, setTransactions] = useState([]);
   const [tab, setTab] = useState('overview');
   const [msg, setMsg] = useState('');
+  const [msgType, setMsgType] = useState('success');
   const [depForm, setDepForm] = useState({amount:'',currency:'USD',method:'Bank Transfer',program:'Conservative'});
   const [wdForm, setWdForm] = useState({amount:'',source:'Available Profit Balance',method:'Bank Transfer',destination:''});
   const [reportFrom, setReportFrom] = useState('');
   const [reportTo, setReportTo] = useState('');
   const [reportType, setReportType] = useState('all');
+  const [kycUploading, setKycUploading] = useState(false);
+  const [kycStatus, setKycStatus] = useState(null);
 
   useEffect(() => {
     const t = localStorage.getItem('ay_token');
@@ -38,19 +41,22 @@ export default function DashboardPage() {
       const u = await uRes.json();
       const d = await dRes.json();
       const w = await wRes.json();
-      const t = await tRes.json();
+      const tx = await tRes.json();
       setUser(u);
       setDeposits(Array.isArray(d) ? d : []);
       setWithdrawals(Array.isArray(w) ? w : []);
-      setTransactions(Array.isArray(t) ? t : []);
-    } catch (err) {
-      console.error('Load error:', err);
-    }
+      setTransactions(Array.isArray(tx) ? tx : []);
+      // Check KYC status
+      try {
+        const kRes = await fetch('/api/kyc', { headers: hd });
+        if (kRes.ok) { const k = await kRes.json(); setKycStatus(k); }
+      } catch {}
+    } catch (err) { console.error('Load error:', err); }
   }, [token]);
 
   useEffect(() => { if (token) load(); }, [token, load]);
 
-  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
+  const flash = (m, type) => { setMsg(m); setMsgType(type || 'success'); setTimeout(() => setMsg(''), 4000); };
   const usd = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const submitDeposit = async (e) => {
@@ -61,9 +67,10 @@ export default function DashboardPage() {
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
         body: JSON.stringify(depForm),
       });
-      if (res.ok) { flash('Deposit request submitted!'); setDepForm({amount:'',currency:'USD',method:'Bank Transfer',program:'Conservative'}); load(); }
-      else { const d = await res.json(); flash(d.error || 'Error'); }
-    } catch { flash('Network error'); }
+      const d = await res.json();
+      if (res.ok) { flash('Deposit request submitted! Ref: ' + (d.ref || '')); setDepForm({amount:'',currency:'USD',method:'Bank Transfer',program:'Conservative'}); load(); }
+      else flash(d.error || 'Error', 'error');
+    } catch { flash('Network error', 'error'); }
   };
 
   const submitWithdrawal = async (e) => {
@@ -74,9 +81,30 @@ export default function DashboardPage() {
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
         body: JSON.stringify(wdForm),
       });
+      const d = await res.json();
       if (res.ok) { flash('Withdrawal request submitted!'); setWdForm({amount:'',source:'Available Profit Balance',method:'Bank Transfer',destination:''}); load(); }
-      else { const d = await res.json(); flash(d.error || 'Error'); }
-    } catch { flash('Network error'); }
+      else flash(d.error || 'Error', 'error');
+    } catch { flash('Network error', 'error'); }
+  };
+
+  const uploadKyc = async (type, file) => {
+    if (!file) return;
+    setKycUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result.split(',')[1];
+        const res = await fetch('/api/kyc', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, fileName: file.name, data: base64 }),
+        });
+        if (res.ok) { flash(type + ' uploaded successfully!'); load(); }
+        else { const d = await res.json(); flash(d.error || 'Upload failed', 'error'); }
+        setKycUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch { flash('Upload failed', 'error'); setKycUploading(false); }
   };
 
   const filteredTx = transactions.filter(t => {
@@ -99,15 +127,147 @@ export default function DashboardPage() {
     </div>
   );
 
+  const isApproved = user.status === 'approved';
+  const isPending = user.status === 'pending';
+  const isDisabled = user.status === 'disabled';
   const pendingCount = deposits.filter(d => d.status === 'pending').length + withdrawals.filter(w => w.status === 'pending').length;
 
+  // PENDING CLIENT VIEW — restricted dashboard
+  if (isPending) {
+    return (
+      <div className="app-layout">
+        <aside className="app-sidebar">
+          <a className="brand" href="/"><span className="brand-mark">A</span><span>AurumYield</span></a>
+          <nav className="sidebar-nav">
+            <a className="active" style={{cursor:'pointer'}}>Account Status</a>
+            <a onClick={() => setTab('kyc')} className={tab === 'kyc' ? 'active' : ''} style={{cursor:'pointer'}}>KYC Documents</a>
+          </nav>
+        </aside>
+        <main className="app-main">
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:20,marginBottom:28,flexWrap:'wrap'}}>
+            <div>
+              <span className="eyebrow">ACCOUNT PENDING</span>
+              <h1 style={{fontSize:'clamp(28px,3.5vw,42px)',letterSpacing:-1.5,lineHeight:1,marginTop:8}}>Welcome, <span className="gold">{user.name ? user.name.split(' ')[0] : 'Investor'}</span></h1>
+            </div>
+            <button onClick={logout} className="btn btn-small btn-secondary">Logout</button>
+          </div>
+
+          {msg && <div className={msgType === 'error' ? 'notice' : 'success-msg'} style={{marginBottom:16}}>{msg}</div>}
+
+          {tab !== 'kyc' && (
+            <>
+              <div className="card" style={{padding:32,textAlign:'center',marginBottom:24}}>
+                <div style={{fontSize:48,marginBottom:16}}>⏳</div>
+                <h2 style={{fontSize:24,fontWeight:800,marginBottom:12}}>Your Account is Under Review</h2>
+                <p className="muted" style={{fontSize:15,maxWidth:500,margin:'0 auto 20px'}}>
+                  Our team is reviewing your registration. Once approved, you will have full access to deposit, invest, and manage your portfolio.
+                </p>
+                <div className="tag pending" style={{fontSize:14,padding:'10px 18px'}}>Status: Pending Approval</div>
+              </div>
+
+              <div className="card" style={{padding:24,marginBottom:18}}>
+                <h3 style={{fontSize:18,fontWeight:800,marginBottom:14}}>What happens next?</h3>
+                <div style={{display:'grid',gap:16}}>
+                  {[
+                    { step: '1', title: 'Upload KYC Documents', desc: 'Submit your passport/ID and proof of address for verification.', done: kycStatus && kycStatus.documents && kycStatus.documents.length > 0 },
+                    { step: '2', title: 'Admin Review', desc: 'Our team reviews your registration and documents.', done: false },
+                    { step: '3', title: 'Account Approved', desc: 'Your investment account is created and you can start depositing.', done: false },
+                  ].map((s, i) => (
+                    <div key={i} style={{display:'flex',gap:14,alignItems:'flex-start'}}>
+                      <div style={{width:38,height:38,borderRadius:'50%',display:'grid',placeItems:'center',background: s.done ? 'rgba(123,216,143,.15)' : 'rgba(217,164,65,.12)',border: '1px solid ' + (s.done ? 'rgba(123,216,143,.3)' : 'var(--line)'),color: s.done ? 'var(--green)' : 'var(--gold2)',fontWeight:900,flexShrink:0}}>{s.done ? '✓' : s.step}</div>
+                      <div><strong style={{fontSize:15}}>{s.title}</strong><p className="muted" style={{fontSize:13,marginTop:2}}>{s.desc}</p></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="notice">
+                <strong>Need help?</strong> Contact our support team if you have questions about the approval process.
+              </div>
+            </>
+          )}
+
+          {/* KYC UPLOAD */}
+          {tab === 'kyc' && (
+            <div className="card" style={{padding:24}}>
+              <div style={{marginBottom:20}}><span className="eyebrow">KYC VERIFICATION</span><h2 style={{fontSize:22,fontWeight:800,marginTop:8}}>Upload Your Documents</h2><p className="muted" style={{fontSize:13}}>Required for account approval. Accepted formats: JPG, PNG, PDF (max 5MB).</p></div>
+
+              <div style={{display:'grid',gap:18}}>
+                {[
+                  { type: 'passport', label: 'Passport or National ID', desc: 'Clear photo or scan of your passport or national ID card.' },
+                  { type: 'proof_of_address', label: 'Proof of Address', desc: 'Utility bill, bank statement, or government letter (less than 3 months old).' },
+                  { type: 'selfie', label: 'Selfie with ID', desc: 'Photo of yourself holding your ID document.' },
+                ].map(doc => {
+                  const uploaded = kycStatus && kycStatus.documents && kycStatus.documents.find(d => d.type === doc.type);
+                  return (
+                    <div key={doc.type} style={{padding:20,border:'1px solid ' + (uploaded ? 'rgba(123,216,143,.3)' : 'var(--white)'),borderRadius:20,background: uploaded ? 'rgba(123,216,143,.05)' : 'rgba(0,0,0,.18)'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+                        <div>
+                          <strong style={{fontSize:15}}>{doc.label}</strong>
+                          <p className="muted" style={{fontSize:13,marginTop:2}}>{doc.desc}</p>
+                        </div>
+                        {uploaded ? (
+                          <div style={{display:'flex',alignItems:'center',gap:8}}>
+                            <span className="tag approved">Uploaded</span>
+                            <span className="muted" style={{fontSize:12}}>{uploaded.fileName}</span>
+                          </div>
+                        ) : (
+                          <label className="btn btn-primary btn-small" style={{cursor:'pointer',opacity:kycUploading?0.5:1}}>
+                            {kycUploading ? 'Uploading...' : 'Upload'}
+                            <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{display:'none'}} disabled={kycUploading}
+                              onChange={e => { if (e.target.files[0]) uploadKyc(doc.type, e.target.files[0]); }} />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {kycStatus && kycStatus.documents && kycStatus.documents.length > 0 && (
+                <div className="success-msg" style={{marginTop:18}}>
+                  {kycStatus.documents.length} of 3 documents uploaded. {kycStatus.documents.length >= 3 ? 'All documents submitted — awaiting admin review.' : 'Please upload remaining documents.'}
+                </div>
+              )}
+            </div>
+          )}
+        </main>
+      </div>
+    );
+  }
+
+  // DISABLED CLIENT VIEW
+  if (isDisabled) {
+    return (
+      <div className="app-layout">
+        <aside className="app-sidebar">
+          <a className="brand" href="/"><span className="brand-mark">A</span><span>AurumYield</span></a>
+        </aside>
+        <main className="app-main">
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:20,marginBottom:28}}>
+            <h1 style={{fontSize:'clamp(28px,3.5vw,42px)',letterSpacing:-1.5,lineHeight:1}}>Account Disabled</h1>
+            <button onClick={logout} className="btn btn-small btn-secondary">Logout</button>
+          </div>
+          <div className="card" style={{padding:32,textAlign:'center'}}>
+            <div style={{fontSize:48,marginBottom:16}}>🚫</div>
+            <h2 style={{fontSize:24,fontWeight:800,marginBottom:12,color:'#ffd5d5'}}>Your Account Has Been Disabled</h2>
+            <p className="muted" style={{fontSize:15,maxWidth:500,margin:'0 auto'}}>
+              Your account has been disabled by an administrator. If you believe this is an error, please contact our support team.
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // APPROVED CLIENT — FULL DASHBOARD
   return (
     <div className="app-layout">
       <aside className="app-sidebar">
         <a className="brand" href="/"><span className="brand-mark">A</span><span>AurumYield</span></a>
         <nav className="sidebar-nav">
-          {['overview','deposit','withdrawal','reports'].map(t => (
-            <a key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)} style={{cursor:'pointer',textTransform:'capitalize'}}>{t}</a>
+          {['overview','deposit','withdrawal','reports','kyc'].map(t => (
+            <a key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)} style={{cursor:'pointer',textTransform:'capitalize'}}>{t === 'kyc' ? 'KYC Documents' : t}</a>
           ))}
         </nav>
         <div className="side-card">
@@ -132,9 +292,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {msg && <div className="success-msg" style={{marginBottom:16}}>{msg}</div>}
-        {user.status === 'pending' && <div className="notice" style={{marginBottom:20}}>Your account is pending approval. You will be able to deposit and invest once approved by admin.</div>}
-        {user.status === 'disabled' && <div style={{padding:16,borderRadius:18,background:'rgba(240,127,127,.08)',border:'1px solid rgba(240,127,127,.2)',color:'#ffd5d5',marginBottom:20}}>Your account has been disabled. Please contact support.</div>}
+        {msg && <div className={msgType === 'error' ? 'notice' : 'success-msg'} style={{marginBottom:16}}>{msg}</div>}
 
         {/* STATS */}
         {(tab === 'overview' || tab === 'deposit' || tab === 'withdrawal') && (
@@ -146,30 +304,17 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* DEPOSIT SECTION */}
+        {/* DEPOSIT FORM */}
         {(tab === 'overview' || tab === 'deposit') && (
-          <div className="actions-grid" style={{marginTop:18}}>
-            <div className="card" style={{padding:24}}>
-              <div style={{marginBottom:18}}><span className="eyebrow">DEPOSIT</span><h2 style={{fontSize:22,fontWeight:800,marginTop:8}}>Fund Your Account</h2><p className="muted" style={{fontSize:13}}>Submit a deposit request for admin review.</p></div>
-              <form onSubmit={submitDeposit} className="fields">
-                <div className="field"><label>Amount (min $1,000)</label><input required type="number" min="1000" value={depForm.amount} onChange={e => setDepForm({...depForm,amount:e.target.value})} placeholder="1000" disabled={user.status !== 'approved'} /></div>
-                <div className="field"><label>Currency</label><select value={depForm.currency} onChange={e => setDepForm({...depForm,currency:e.target.value})} disabled={user.status !== 'approved'}><option>USD</option><option>AED</option><option>EUR</option><option>GBP</option></select></div>
-                <div className="field"><label>Method</label><select value={depForm.method} onChange={e => setDepForm({...depForm,method:e.target.value})} disabled={user.status !== 'approved'}><option>Bank Transfer</option><option>Card Payment</option><option>USDT / Stablecoin</option></select></div>
-                <div className="field"><label>Program</label><select value={depForm.program} onChange={e => setDepForm({...depForm,program:e.target.value})} disabled={user.status !== 'approved'}><option>Conservative</option><option>Growth</option></select></div>
-                <div className="full"><button type="submit" className="btn btn-primary" disabled={user.status !== 'approved'}>Create Deposit Request</button></div>
-              </form>
-            </div>
-
-            <div className="card" style={{padding:24}}>
-              <div style={{marginBottom:18}}><span className="eyebrow">WITHDRAWAL</span><h2 style={{fontSize:22,fontWeight:800,marginTop:8}}>Request Withdrawal</h2><p className="muted" style={{fontSize:13}}>Withdraw from available profit balance.</p></div>
-              <form onSubmit={submitWithdrawal} className="fields">
-                <div className="field"><label>Amount</label><input required type="number" min="100" value={wdForm.amount} onChange={e => setWdForm({...wdForm,amount:e.target.value})} placeholder="Amount" disabled={user.status !== 'approved'} /></div>
-                <div className="field"><label>Withdraw From</label><select value={wdForm.source} onChange={e => setWdForm({...wdForm,source:e.target.value})} disabled={user.status !== 'approved'}><option>Available Profit Balance</option><option>Total Account Balance</option></select></div>
-                <div className="field"><label>Method</label><select value={wdForm.method} onChange={e => setWdForm({...wdForm,method:e.target.value})} disabled={user.status !== 'approved'}><option>Bank Transfer</option><option>Crypto Wallet</option></select></div>
-                <div className="field"><label>Destination</label><input required value={wdForm.destination} onChange={e => setWdForm({...wdForm,destination:e.target.value})} placeholder="IBAN / Wallet" disabled={user.status !== 'approved'} /></div>
-                <div className="full"><button type="submit" className="btn btn-danger" disabled={user.status !== 'approved'}>Submit Withdrawal Request</button></div>
-              </form>
-            </div>
+          <div className="card" style={{padding:24,marginTop:18}}>
+            <div style={{marginBottom:18}}><span className="eyebrow">DEPOSIT</span><h2 style={{fontSize:22,fontWeight:800,marginTop:8}}>Fund Your Account</h2><p className="muted" style={{fontSize:13}}>Submit a deposit request for admin review.</p></div>
+            <form onSubmit={submitDeposit} className="fields">
+              <div className="field"><label>Amount (min $1,000)</label><input required type="number" min="1000" value={depForm.amount} onChange={e => setDepForm({...depForm,amount:e.target.value})} placeholder="1000" /></div>
+              <div className="field"><label>Currency</label><select value={depForm.currency} onChange={e => setDepForm({...depForm,currency:e.target.value})}><option>USD</option><option>AED</option><option>EUR</option><option>GBP</option></select></div>
+              <div className="field"><label>Method</label><select value={depForm.method} onChange={e => setDepForm({...depForm,method:e.target.value})}><option>Bank Transfer</option><option>Card Payment</option><option>USDT / Stablecoin</option></select></div>
+              <div className="field"><label>Program</label><select value={depForm.program} onChange={e => setDepForm({...depForm,program:e.target.value})}><option>Conservative</option><option>Growth</option></select></div>
+              <div className="full"><button type="submit" className="btn btn-primary">Create Deposit Request</button></div>
+            </form>
           </div>
         )}
 
@@ -182,17 +327,25 @@ export default function DashboardPage() {
                 <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Ref</th><th>Status</th></tr></thead>
                 <tbody>
                   {deposits.map(d => (
-                    <tr key={d.id}>
-                      <td>{d.date}</td>
-                      <td style={{fontWeight:700}}>{usd(d.amount)}</td>
-                      <td>{d.method}</td>
-                      <td>{d.ref}</td>
-                      <td><span className={'tag ' + d.status}>{d.status}</span></td>
-                    </tr>
+                    <tr key={d.id}><td>{d.date}</td><td style={{fontWeight:700}}>{usd(d.amount)}</td><td>{d.method}</td><td>{d.ref}</td><td><span className={'tag ' + d.status}>{d.status}</span></td></tr>
                   ))}
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* WITHDRAWAL FORM */}
+        {(tab === 'overview' || tab === 'withdrawal') && (
+          <div className="card" style={{padding:24,marginTop:18}}>
+            <div style={{marginBottom:18}}><span className="eyebrow">WITHDRAWAL</span><h2 style={{fontSize:22,fontWeight:800,marginTop:8}}>Request Withdrawal</h2><p className="muted" style={{fontSize:13}}>Withdraw from available profit balance. Available: {usd(user.withdrawable)}</p></div>
+            <form onSubmit={submitWithdrawal} className="fields">
+              <div className="field"><label>Amount</label><input required type="number" min="100" max={user.withdrawable} value={wdForm.amount} onChange={e => setWdForm({...wdForm,amount:e.target.value})} placeholder="Amount" /></div>
+              <div className="field"><label>Withdraw From</label><select value={wdForm.source} onChange={e => setWdForm({...wdForm,source:e.target.value})}><option>Available Profit Balance</option><option>Total Account Balance</option></select></div>
+              <div className="field"><label>Method</label><select value={wdForm.method} onChange={e => setWdForm({...wdForm,method:e.target.value})}><option>Bank Transfer</option><option>Crypto Wallet</option></select></div>
+              <div className="field"><label>Destination</label><input required value={wdForm.destination} onChange={e => setWdForm({...wdForm,destination:e.target.value})} placeholder="IBAN / Wallet address" /></div>
+              <div className="full"><button type="submit" className="btn btn-danger">Submit Withdrawal Request</button></div>
+            </form>
           </div>
         )}
 
@@ -205,13 +358,7 @@ export default function DashboardPage() {
                 <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Destination</th><th>Status</th></tr></thead>
                 <tbody>
                   {withdrawals.map(w => (
-                    <tr key={w.id}>
-                      <td>{w.date}</td>
-                      <td style={{fontWeight:700}}>{usd(w.amount)}</td>
-                      <td>{w.method}</td>
-                      <td>{w.destination}</td>
-                      <td><span className={'tag ' + w.status}>{w.status}</span></td>
-                    </tr>
+                    <tr key={w.id}><td>{w.date}</td><td style={{fontWeight:700}}>{usd(w.amount)}</td><td>{w.method}</td><td>{w.destination}</td><td><span className={'tag ' + w.status}>{w.status}</span></td></tr>
                   ))}
                 </tbody>
               </table>
@@ -220,11 +367,9 @@ export default function DashboardPage() {
         )}
 
         {/* BALANCE CHART */}
-        {(tab === 'overview') && (
+        {tab === 'overview' && (
           <div className="card" style={{padding:24,marginTop:18}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:18}}>
-              <div><span className="eyebrow">BALANCE</span><h2 style={{fontSize:22,fontWeight:800,marginTop:8}}>Portfolio Balance</h2></div>
-            </div>
+            <div style={{marginBottom:18}}><span className="eyebrow">BALANCE</span><h2 style={{fontSize:22,fontWeight:800,marginTop:8}}>Portfolio Balance</h2></div>
             <div className="chart">{[45,52,49,68,74,82,77,89,94,88,96,100].map((ht,i) => <div key={i} className="bar" style={{height: ht + '%'}} />)}</div>
           </div>
         )}
@@ -245,24 +390,48 @@ export default function DashboardPage() {
                   {filteredTx.length === 0 ? (
                     <tr><td colSpan={5} style={{textAlign:'center',color:'var(--muted)'}}>No transactions found</td></tr>
                   ) : filteredTx.map(t => (
-                    <tr key={t.id}>
-                      <td>{t.date}</td>
-                      <td style={{textTransform:'capitalize'}}>{t.type}</td>
-                      <td>{t.desc}</td>
-                      <td style={{color: t.amount >= 0 ? 'var(--green)' : 'var(--red)', fontWeight:700}}>{t.amount >= 0 ? '+' : ''}{usd(Math.abs(t.amount))}</td>
-                      <td><span className={'tag ' + t.status.toLowerCase()}>{t.status}</span></td>
-                    </tr>
+                    <tr key={t.id}><td>{t.date}</td><td style={{textTransform:'capitalize'}}>{t.type}</td><td>{t.desc}</td><td style={{color: t.amount >= 0 ? 'var(--green)' : 'var(--red)', fontWeight:700}}>{t.amount >= 0 ? '+' : ''}{usd(Math.abs(t.amount))}</td><td><span className={'tag ' + t.status.toLowerCase()}>{t.status}</span></td></tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="muted" style={{fontSize:12,marginTop:14}}>All transactions are tracked and audited.</p>
           </div>
         )}
 
-        <div className="notice" style={{marginTop:24}}>
-          <strong>Security & Compliance:</strong> This platform requires secure login, encrypted data, KYC/AML checks, and signed investor agreements before going live. Target returns are not guarantees.
-        </div>
+        {/* KYC DOCUMENTS TAB */}
+        {tab === 'kyc' && (
+          <div className="card" style={{padding:24,marginTop:18}}>
+            <div style={{marginBottom:20}}><span className="eyebrow">KYC VERIFICATION</span><h2 style={{fontSize:22,fontWeight:800,marginTop:8}}>Your Documents</h2><p className="muted" style={{fontSize:13}}>Upload or update your verification documents.</p></div>
+            <div style={{display:'grid',gap:18}}>
+              {[
+                { type: 'passport', label: 'Passport or National ID', desc: 'Clear photo or scan of your passport or national ID card.' },
+                { type: 'proof_of_address', label: 'Proof of Address', desc: 'Utility bill, bank statement, or government letter (less than 3 months old).' },
+                { type: 'selfie', label: 'Selfie with ID', desc: 'Photo of yourself holding your ID document.' },
+              ].map(doc => {
+                const uploaded = kycStatus && kycStatus.documents && kycStatus.documents.find(d => d.type === doc.type);
+                return (
+                  <div key={doc.type} style={{padding:20,border:'1px solid ' + (uploaded ? 'rgba(123,216,143,.3)' : 'var(--white)'),borderRadius:20,background: uploaded ? 'rgba(123,216,143,.05)' : 'rgba(0,0,0,.18)'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+                      <div><strong style={{fontSize:15}}>{doc.label}</strong><p className="muted" style={{fontSize:13,marginTop:2}}>{doc.desc}</p></div>
+                      {uploaded ? (
+                        <div style={{display:'flex',alignItems:'center',gap:8}}>
+                          <span className="tag approved">Uploaded</span>
+                          <span className="muted" style={{fontSize:12}}>{uploaded.fileName}</span>
+                        </div>
+                      ) : (
+                        <label className="btn btn-primary btn-small" style={{cursor:'pointer',opacity:kycUploading?0.5:1}}>
+                          {kycUploading ? 'Uploading...' : 'Upload'}
+                          <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{display:'none'}} disabled={kycUploading}
+                            onChange={e => { if (e.target.files[0]) uploadKyc(doc.type, e.target.files[0]); }} />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
