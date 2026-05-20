@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
-import { initData } from '../lib/data.js';
+import { getDeposits, createDeposit, getDepositById, updateDepositStatus, getUserById, updateUserBalance, updateUserStatus, addTransaction, addAudit } from '../lib/data.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'aurumyield-dev-secret';
 
@@ -11,54 +11,57 @@ function getAuth(request) {
 }
 
 export async function GET(request) {
-  initData();
   const auth = getAuth(request);
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (auth.role === 'admin' || auth.role === 'superadmin') return NextResponse.json(global.__deposits);
-  return NextResponse.json(global.__deposits.filter(d => d.userId === auth.userId));
+  try {
+    if (auth.role === 'admin' || auth.role === 'superadmin') return NextResponse.json(await getDeposits());
+    return NextResponse.json(await getDeposits(auth.userId));
+  } catch (e) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
 }
 
 export async function POST(request) {
-  initData();
   const auth = getAuth(request);
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const data = await request.json();
+  try {
+    const data = await request.json();
 
-  if ((auth.role === 'admin' || auth.role === 'superadmin') && data.action) {
-    const dep = global.__deposits.find(d => d.id === data.depositId);
-    if (!dep) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    const user = global.__users.find(u => u.id === dep.userId);
+    // Admin approving/rejecting
+    if ((auth.role === 'admin' || auth.role === 'superadmin') && data.action) {
+      const dep = await getDepositById(data.depositId);
+      if (!dep) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      const user = await getUserById(dep.userId);
 
-    if (data.action === 'approve') {
-      dep.status = 'approved';
-      if (user) {
-        user.balance += dep.amount;
-        user.lockedCapital += dep.amount;
-        if (user.status === 'pending') user.status = 'approved';
-        const txId = Math.max(0, ...global.__transactions.map(t => t.id)) + 1;
-        global.__transactions.push({ id: txId, userId: user.id, type: 'deposit', desc: `Deposit approved — ${dep.ref}`, amount: dep.amount, balanceBefore: user.balance - dep.amount, balanceAfter: user.balance, status: 'Paid', date: new Date().toISOString().split('T')[0] });
+      if (data.action === 'approve') {
+        await updateDepositStatus(dep.id, 'approved');
+        if (user) {
+          const newBalance = user.balance + dep.amount;
+          const newLocked = user.lockedCapital + dep.amount;
+          await updateUserBalance(user.id, newBalance, user.withdrawable, newLocked, user.lastProfit);
+          if (user.status === 'pending') await updateUserStatus(user.id, 'approved');
+          await addTransaction(user.id, 'deposit', `Deposit approved — ${dep.ref}`, dep.amount, user.balance, newBalance);
+        }
+        await addAudit(`Approved deposit ${dep.ref} for ${user?.name}; +$${dep.amount.toLocaleString()}`, auth.username || 'Admin');
+      } else if (data.action === 'reject') {
+        await updateDepositStatus(dep.id, 'rejected');
+        await addAudit(`Rejected deposit ${dep.ref}`, auth.username || 'Admin');
       }
-      global.__audit.unshift({ action: `Approved deposit ${dep.ref} for ${user?.name}; +$${dep.amount.toLocaleString()}`, admin: auth.username || 'Admin', date: new Date().toISOString(), ip: '0.0.0.0' });
-    } else if (data.action === 'reject') {
-      dep.status = 'rejected';
-      global.__audit.unshift({ action: `Rejected deposit ${dep.ref}`, admin: auth.username || 'Admin', date: new Date().toISOString(), ip: '0.0.0.0' });
+      return NextResponse.json({ ok: true });
     }
-    return NextResponse.json({ ok: true });
-  }
 
-  if (auth.role === 'client') {
-    const user = global.__users.find(u => u.id === auth.userId);
-    if (!user || user.status === 'disabled') return NextResponse.json({ error: 'Account not active' }, { status: 403 });
-    if (!data.amount || Number(data.amount) < 1000) return NextResponse.json({ error: 'Minimum deposit is $1,000' }, { status: 400 });
-    const id = Math.max(0, ...global.__deposits.map(d => d.id)) + 1;
-    global.__deposits.push({
-      id, userId: auth.userId, amount: Number(data.amount), currency: data.currency || 'USD',
-      method: data.method || 'Bank Transfer', status: 'pending', proof: null,
-      ref: `DEP-${1000 + id}`, date: new Date().toISOString().split('T')[0],
-    });
-    global.__audit.unshift({ action: `New deposit request from ${user.name}: $${data.amount}`, admin: 'System', date: new Date().toISOString(), ip: '0.0.0.0' });
-    return NextResponse.json({ ok: true });
-  }
+    // Client creating deposit
+    if (auth.role === 'client') {
+      const user = await getUserById(auth.userId);
+      if (!user || user.status === 'disabled') return NextResponse.json({ error: 'Account not active' }, { status: 403 });
+      if (!data.amount || Number(data.amount) < 1000) return NextResponse.json({ error: 'Minimum deposit is $1,000' }, { status: 400 });
+      const { ref } = await createDeposit(auth.userId, Number(data.amount), data.currency || 'USD', data.method || 'Bank Transfer');
+      await addAudit(`New deposit request from ${user.name}: $${data.amount}`, 'System');
+      return NextResponse.json({ ok: true, ref });
+    }
 
-  return NextResponse.json({ error: 'Bad request' }, { status: 400 });
+    return NextResponse.json({ error: 'Bad request' }, { status: 400 });
+  } catch (e) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
 }
