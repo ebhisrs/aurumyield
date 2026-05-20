@@ -8,9 +8,13 @@ export default function AdminPage() {
   const [deposits, setDeposits] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
   const [audit, setAudit] = useState([]);
+  const [kycDocs, setKycDocs] = useState([]);
   const [msg, setMsg] = useState('');
   const [profitForm, setProfitForm] = useState({program:'Conservative',percentage:'4',note:''});
   const [showProfitModal, setShowProfitModal] = useState(false);
+  const [viewDoc, setViewDoc] = useState(null);
+  const [viewDocData, setViewDocData] = useState(null);
+  const [loadingDoc, setLoadingDoc] = useState(false);
 
   useEffect(() => {
     const t = localStorage.getItem('ay_token');
@@ -24,13 +28,15 @@ export default function AdminPage() {
   const load = useCallback(async () => {
     if (!token) return;
     const hd = { Authorization: `Bearer ${token}` };
-    const [c, d, w, a] = await Promise.all([
+    const [c, d, w, a, k] = await Promise.all([
       fetch('/api/clients', { headers: hd }).then(r => r.json()),
       fetch('/api/deposits', { headers: hd }).then(r => r.json()),
       fetch('/api/withdrawals', { headers: hd }).then(r => r.json()),
       fetch('/api/profit?type=audit', { headers: hd }).then(r => r.json()),
+      fetch('/api/kyc', { headers: hd }).then(r => r.json()).catch(() => ({ documents: [] })),
     ]);
     setClients(Array.isArray(c)?c:[]); setDeposits(Array.isArray(d)?d:[]); setWithdrawals(Array.isArray(w)?w:[]); setAudit(Array.isArray(a)?a:[]);
+    setKycDocs(k.documents || []);
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
@@ -62,6 +68,26 @@ export default function AdminPage() {
     else { flash(`Profit posted to ${data.clients} clients. Total: ${usd(data.totalProfit)}`); setShowProfitModal(false); load(); }
   };
 
+  const kycAction = async (docId, action) => {
+    const res = await fetch('/api/kyc', { method: 'POST', headers: h(), body: JSON.stringify({ docId, action }) });
+    if (res.ok) { flash(`Document ${action}d`); setViewDoc(null); setViewDocData(null); load(); }
+    else { const d = await res.json(); flash(d.error || 'Error'); }
+  };
+
+  const openDoc = async (doc) => {
+    setViewDoc(doc);
+    setViewDocData(null);
+    setLoadingDoc(true);
+    try {
+      const res = await fetch(`/api/kyc?docId=${doc.id}&download=true`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setViewDocData(data.data);
+      }
+    } catch {}
+    setLoadingDoc(false);
+  };
+
   const logout = () => { localStorage.clear(); window.location.href = '/login'; };
 
   const activeClients = clients.filter(c => c.status === 'approved');
@@ -69,25 +95,33 @@ export default function AdminPage() {
   const pendingDeposits = deposits.filter(d => d.status === 'pending');
   const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending');
   const pendingClients = clients.filter(c => c.status === 'pending');
+  const pendingKyc = kycDocs.filter(d => d.status === 'pending');
   const eligibleForProfit = clients.filter(c => c.program === profitForm.program && c.status === 'approved');
 
   if (!token) return <div style={{background:'var(--bg)',minHeight:'100vh'}} />;
 
-  const navItems = ['overview','profit','clients','deposits','withdrawals','audit'];
+  const navItems = ['overview','profit','clients','deposits','withdrawals','kyc','audit'];
 
   return (
     <div className="app-layout">
       <aside className="app-sidebar">
         <div className="brand" style={{marginBottom:34}}><div className="brand-mark">A</div><div><span style={{fontWeight:900,fontSize:18}}>AurumYield</span><small style={{display:'block',color:'var(--muted)',fontWeight:600,fontSize:12}}>Admin Cabinet</small></div></div>
         <nav className="sidebar-nav">
-          {navItems.map(t => <a key={t} className={tab===t?'active':''} onClick={() => setTab(t)} style={{cursor:'pointer',textTransform:'capitalize'}}>{t === 'profit' ? 'Post Profit' : t}</a>)}
+          {navItems.map(t => (
+            <a key={t} className={tab===t?'active':''} onClick={() => setTab(t)} style={{cursor:'pointer',textTransform:'capitalize',position:'relative'}}>
+              {t === 'profit' ? 'Post Profit' : t === 'kyc' ? 'KYC Review' : t}
+              {t === 'kyc' && pendingKyc.length > 0 && (
+                <span style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',background:'var(--gold)',color:'#111',borderRadius:'50%',width:22,height:22,display:'grid',placeItems:'center',fontSize:11,fontWeight:900}}>{pendingKyc.length}</span>
+              )}
+            </a>
+          ))}
         </nav>
         <div className="side-card"><strong style={{display:'block',marginBottom:8}}>Admin Safety Rule</strong><p className="muted" style={{fontSize:13}}>Every balance-changing action creates an audit record.</p></div>
       </aside>
 
       <main className="app-main">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:16,marginBottom:24,flexWrap:'wrap'}}>
-          <div><h1 style={{fontSize:'clamp(26px,3.5vw,40px)',letterSpacing:-1.5,lineHeight:1}}>Admin Dashboard</h1><p className="muted" style={{marginTop:8}}>Manage clients, deposits, withdrawals, and profit allocation.</p></div>
+          <div><h1 style={{fontSize:'clamp(26px,3.5vw,40px)',letterSpacing:-1.5,lineHeight:1}}>Admin Dashboard</h1><p className="muted" style={{marginTop:8}}>Manage clients, deposits, withdrawals, KYC, and profit allocation.</p></div>
           <div style={{display:'flex',gap:10,alignItems:'center'}}>
             <div style={{display:'flex',gap:8,alignItems:'center',padding:'10px 16px',border:'1px solid var(--white)',borderRadius:999,background:'rgba(255,255,255,.04)'}}>
               <span style={{width:10,height:10,borderRadius:'50%',background:'var(--green)',boxShadow:'0 0 18px rgba(126,224,161,.6)'}} />
@@ -104,7 +138,7 @@ export default function AdminPage() {
           <div className="card stat"><div className="stat-label">Total AUM</div><div className="stat-value">{usd(totalAum)}</div></div>
           <div className="card stat"><div className="stat-label">Active Clients</div><div className="stat-value">{activeClients.length}</div></div>
           <div className="card stat"><div className="stat-label">Pending Deposits</div><div className="stat-value">{pendingDeposits.length}</div></div>
-          <div className="card stat"><div className="stat-label">Pending Withdrawals</div><div className="stat-value">{pendingWithdrawals.length}</div></div>
+          <div className="card stat"><div className="stat-label">Pending KYC</div><div className="stat-value" style={{color: pendingKyc.length > 0 ? 'var(--gold2)' : 'inherit'}}>{pendingKyc.length}</div></div>
         </div>
 
         {/* PROFIT POSTING */}
@@ -133,28 +167,79 @@ export default function AdminPage() {
             </div>
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Client</th><th>Program</th><th>Status</th><th>Balance</th><th>Withdrawable</th><th>Last Profit</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Client</th><th>Program</th><th>Status</th><th>Balance</th><th>KYC</th><th>Actions</th></tr></thead>
                 <tbody>
-                  {clients.map(c => (
-                    <tr key={c.id}>
-                      <td><strong>{c.name}</strong><br/><span className="muted" style={{fontSize:12}}>{c.email}</span></td>
-                      <td><span className="tag" style={{color:c.program==='Growth'?'var(--blue)':'var(--gold2)',background:c.program==='Growth'?'rgba(133,183,255,.09)':'rgba(217,164,65,.09)'}}>{c.program}</span></td>
-                      <td><span className={`tag ${c.status}`}>{c.status}</span></td>
-                      <td style={{fontWeight:700}}>{usd(c.balance)}</td>
-                      <td>{usd(c.withdrawable)}</td>
-                      <td>{c.lastProfit}</td>
-                      <td>
-                        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                          {c.status === 'pending' && <button className="btn btn-ok btn-small" onClick={() => clientAction(c.id,'approve')}>Approve</button>}
-                          {c.status !== 'disabled' && <button className="btn btn-danger btn-small" onClick={() => clientAction(c.id,'disable')}>Disable</button>}
-                          {c.status === 'disabled' && <button className="btn btn-ok btn-small" onClick={() => clientAction(c.id,'enable')}>Enable</button>}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {clients.map(c => {
+                    const clientKyc = kycDocs.filter(d => d.userId === c.id);
+                    const kycCount = clientKyc.length;
+                    const kycApproved = clientKyc.filter(d => d.status === 'approved').length;
+                    return (
+                      <tr key={c.id}>
+                        <td><strong>{c.name}</strong><br/><span className="muted" style={{fontSize:12}}>{c.email}</span></td>
+                        <td><span className="tag" style={{color:c.program==='Growth'?'var(--blue)':'var(--gold2)',background:c.program==='Growth'?'rgba(133,183,255,.09)':'rgba(217,164,65,.09)'}}>{c.program}</span></td>
+                        <td><span className={`tag ${c.status}`}>{c.status}</span></td>
+                        <td style={{fontWeight:700}}>{usd(c.balance)}</td>
+                        <td>
+                          {kycCount === 0 ? (
+                            <span className="muted" style={{fontSize:12}}>No docs</span>
+                          ) : (
+                            <span className="tag" style={{color: kycApproved === kycCount ? 'var(--green)' : 'var(--gold2)', background: kycApproved === kycCount ? 'rgba(123,216,143,.08)' : 'rgba(217,164,65,.08)'}}>{kycApproved}/{kycCount} approved</span>
+                          )}
+                        </td>
+                        <td>
+                          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                            {c.status === 'pending' && <button className="btn btn-ok btn-small" onClick={() => clientAction(c.id,'approve')}>Approve</button>}
+                            {c.status !== 'disabled' && <button className="btn btn-danger btn-small" onClick={() => clientAction(c.id,'disable')}>Disable</button>}
+                            {c.status === 'disabled' && <button className="btn btn-ok btn-small" onClick={() => clientAction(c.id,'enable')}>Enable</button>}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* KYC REVIEW */}
+        {(tab === 'overview' || tab === 'kyc') && (
+          <div className="card" style={{padding:24,marginTop:18}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+              <div><span className="eyebrow">KYC REVIEW</span><h2 style={{fontSize:22,fontWeight:800,marginTop:8}}>Client Documents</h2><p className="muted" style={{fontSize:13}}>Review, approve, or reject uploaded KYC documents.</p></div>
+              {pendingKyc.length > 0 && <span className="tag pending">{pendingKyc.length} pending review</span>}
+            </div>
+            {kycDocs.length === 0 ? (
+              <p className="muted" style={{textAlign:'center',padding:24}}>No KYC documents uploaded yet.</p>
+            ) : (
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>Client</th><th>Document Type</th><th>File</th><th>Status</th><th>Uploaded</th><th>Actions</th></tr></thead>
+                  <tbody>
+                    {(tab === 'kyc' ? kycDocs : kycDocs.filter(d => d.status === 'pending')).map(d => (
+                      <tr key={d.id}>
+                        <td><strong>{d.userName || 'Unknown'}</strong><br/><span className="muted" style={{fontSize:12}}>{d.userEmail || ''}</span></td>
+                        <td style={{textTransform:'capitalize'}}>{d.type ? d.type.replace(/_/g, ' ') : ''}</td>
+                        <td><span className="muted" style={{fontSize:12}}>{d.fileName}</span></td>
+                        <td><span className={`tag ${d.status}`}>{d.status}</span></td>
+                        <td style={{fontSize:12}}>{d.date ? new Date(d.date).toLocaleDateString() : ''}</td>
+                        <td>
+                          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                            <button className="btn btn-small btn-secondary" onClick={() => openDoc(d)}>View</button>
+                            {d.status === 'pending' && (
+                              <>
+                                <button className="btn btn-ok btn-small" onClick={() => kycAction(d.id, 'approve')}>Approve</button>
+                                <button className="btn btn-danger btn-small" onClick={() => kycAction(d.id, 'reject')}>Reject</button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
@@ -249,11 +334,48 @@ export default function AdminPage() {
                 Apply {profitForm.percentage}% profit to {eligibleForProfit.length} active {profitForm.program} client(s)?
                 This will add {usd(eligibleForProfit.reduce((s,c) => s + c.balance * Number(profitForm.percentage)/100, 0))} total to their balances.
               </p>
-              <div className="notice" style={{marginBottom:18}}>This action cannot be undone. A reversal transaction would need to be created manually.</div>
+              <div className="notice" style={{marginBottom:18}}>This action cannot be undone.</div>
               <div style={{display:'flex',gap:10}}>
                 <button className="btn btn-primary" onClick={postProfit}>Confirm & Post</button>
                 <button className="btn btn-secondary" onClick={() => setShowProfitModal(false)}>Cancel</button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW DOCUMENT MODAL */}
+        {viewDoc && (
+          <div className="modal-overlay" onClick={() => { setViewDoc(null); setViewDocData(null); }}>
+            <div className="modal-box" style={{maxWidth:800,maxHeight:'90vh',overflow:'auto'}} onClick={e => e.stopPropagation()}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:18}}>
+                <div>
+                  <h3 style={{fontSize:22,fontWeight:800}}>KYC Document</h3>
+                  <p className="muted" style={{marginTop:4}}>{viewDoc.userName} — {viewDoc.type ? viewDoc.type.replace(/_/g, ' ') : ''}</p>
+                  <p className="muted" style={{fontSize:12}}>{viewDoc.fileName} • Status: <span className={`tag ${viewDoc.status}`} style={{display:'inline'}}>{viewDoc.status}</span></p>
+                </div>
+                <button className="btn btn-small btn-secondary" onClick={() => { setViewDoc(null); setViewDocData(null); }}>Close</button>
+              </div>
+
+              {loadingDoc && <div style={{textAlign:'center',padding:40}}><p className="muted">Loading document...</p></div>}
+
+              {viewDocData && (
+                <div style={{borderRadius:16,overflow:'hidden',border:'1px solid var(--white)',marginBottom:18}}>
+                  {viewDoc.fileName && (viewDoc.fileName.endsWith('.pdf')) ? (
+                    <iframe src={`data:application/pdf;base64,${viewDocData}`} style={{width:'100%',height:500,border:0}} />
+                  ) : (
+                    <img src={`data:image/jpeg;base64,${viewDocData}`} style={{width:'100%',display:'block'}} alt="KYC Document" />
+                  )}
+                </div>
+              )}
+
+              {!loadingDoc && !viewDocData && <div style={{textAlign:'center',padding:40}}><p className="muted">Could not load document preview.</p></div>}
+
+              {viewDoc.status === 'pending' && (
+                <div style={{display:'flex',gap:10}}>
+                  <button className="btn btn-ok" onClick={() => kycAction(viewDoc.id, 'approve')}>Approve Document</button>
+                  <button className="btn btn-danger" onClick={() => kycAction(viewDoc.id, 'reject')}>Reject Document</button>
+                </div>
+              )}
             </div>
           </div>
         )}

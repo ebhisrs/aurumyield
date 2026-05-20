@@ -7,17 +7,11 @@ const { Pool } = pg;
 
 let pool;
 function getPool() {
-  if (!pool) {
-    pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 5 });
-  }
+  if (!pool) pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 5 });
   return pool;
 }
+async function query(text, params) { return await getPool().query(text, params); }
 
-async function query(text, params) {
-  return await getPool().query(text, params);
-}
-
-// Ensure KYC table exists
 async function ensureTable() {
   await query(`
     CREATE TABLE IF NOT EXISTS kyc_documents (
@@ -41,24 +35,32 @@ function getAuth(request) {
   try { return jwt.verify(auth.slice(7), JWT_SECRET); } catch { return null; }
 }
 
-// GET — client gets their docs, admin gets all or specific user
 export async function GET(request) {
   const auth = getAuth(request);
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     await ensureTable();
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const docId = searchParams.get('docId');
+    const download = searchParams.get('download');
+
+    // Admin downloading a specific document (with file data)
+    if ((auth.role === 'admin' || auth.role === 'superadmin') && docId && download) {
+      const { rows } = await query('SELECT data, file_name FROM kyc_documents WHERE id = $1', [docId]);
+      if (rows.length === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      return NextResponse.json({ data: rows[0].data, fileName: rows[0].file_name });
+    }
 
     // Admin viewing specific client's docs
+    const userId = searchParams.get('userId');
     if ((auth.role === 'admin' || auth.role === 'superadmin') && userId) {
       const { rows } = await query('SELECT id, user_id, type, file_name, status, created_at FROM kyc_documents WHERE user_id = $1 ORDER BY id', [userId]);
       return NextResponse.json({ documents: rows.map(r => ({ id: r.id, userId: r.user_id, type: r.type, fileName: r.file_name, status: r.status, date: r.created_at })) });
     }
 
-    // Admin viewing all pending KYC
+    // Admin viewing all KYC docs
     if (auth.role === 'admin' || auth.role === 'superadmin') {
-      const { rows } = await query("SELECT k.id, k.user_id, k.type, k.file_name, k.status, k.created_at, u.name, u.email FROM kyc_documents k JOIN users u ON k.user_id = u.id ORDER BY k.created_at DESC");
+      const { rows } = await query("SELECT k.id, k.user_id, k.type, k.file_name, k.status, k.created_at, u.name, u.email FROM kyc_documents k JOIN users u ON k.user_id = u.id ORDER BY CASE WHEN k.status = 'pending' THEN 0 ELSE 1 END, k.created_at DESC");
       return NextResponse.json({ documents: rows.map(r => ({ id: r.id, userId: r.user_id, type: r.type, fileName: r.file_name, status: r.status, date: r.created_at, userName: r.name, userEmail: r.email })) });
     }
 
@@ -70,7 +72,6 @@ export async function GET(request) {
   }
 }
 
-// POST — client uploads doc, admin approves/rejects
 export async function POST(request) {
   const auth = getAuth(request);
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -85,7 +86,6 @@ export async function POST(request) {
       } else if (data.action === 'reject') {
         await query('UPDATE kyc_documents SET status = $1, reviewed_by = $2, reviewed_at = NOW() WHERE id = $3', ['rejected', auth.username, data.docId]);
       }
-      // Log to audit
       await query('INSERT INTO audit (action, admin) VALUES ($1, $2)', [`KYC document ${data.action}d (ID: ${data.docId})`, auth.username]);
       return NextResponse.json({ ok: true });
     }
@@ -96,7 +96,6 @@ export async function POST(request) {
       if (!type || !fileName || !fileData) return NextResponse.json({ error: 'Missing file data' }, { status: 400 });
       if (!['passport', 'proof_of_address', 'selfie'].includes(type)) return NextResponse.json({ error: 'Invalid document type' }, { status: 400 });
 
-      // Upsert — replace if already uploaded
       await query(`
         INSERT INTO kyc_documents (user_id, type, file_name, data, status)
         VALUES ($1, $2, $3, $4, 'pending')
@@ -104,7 +103,7 @@ export async function POST(request) {
         DO UPDATE SET file_name = $3, data = $4, status = 'pending', created_at = NOW()
       `, [auth.userId, type, fileName, fileData]);
 
-      await query('INSERT INTO audit (action, admin) VALUES ($1, $2)', [`Client uploaded KYC document: ${type} (${fileName})`, 'System']);
+      await query('INSERT INTO audit (action, admin) VALUES ($1, $2)', [`Client uploaded KYC: ${type} (${fileName})`, 'System']);
       return NextResponse.json({ ok: true });
     }
 
