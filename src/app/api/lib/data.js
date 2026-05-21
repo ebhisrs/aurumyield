@@ -368,6 +368,6 @@ export async function getStats() {
 
 // ─── ELIGIBLE FOR PROFIT ──────────────────────────────────
 export async function getEligibleClients(program) {
-  const { rows } = await query("SELECT id, name, balance, withdrawable, locked_capital, last_profit FROM users WHERE program = $1 AND status = 'approved'", [program]);
-  return rows.map(r => ({ id: r.id, name: r.name, balance: Number(r.balance), withdrawable: Number(r.withdrawable), lockedCapital: Number(r.locked_capital), lastProfit: r.last_profit }));
+  const { rows } = await query("SELECT id, name, balance, withdrawable, locked_capital, last_profit, profit_pref FROM users WHERE program = $1 AND status = 'approved'", [program]);
+  return rows.map(r => ({ id: r.id, name: r.name, balance: Number(r.balance), withdrawable: Number(r.withdrawable), lockedCapital: Number(r.locked_capital), lastProfit: r.last_profit, profitPref: r.profit_pref }));
 }

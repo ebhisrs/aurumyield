@@ -47,13 +47,37 @@ export async function POST(request) {
     if (eligible.length === 0) return NextResponse.json({ error: 'No eligible clients' }, { status: 400 });
 
     let totalProfit = 0;
+    const details = [];
     for (const user of eligible) {
-      const profit = Math.round(user.balance * rate * 100) / 100;
-      const newBalance = user.balance + profit;
-      const newWithdrawable = user.withdrawable + profit;
-      await updateUserBalance(user.id, newBalance, newWithdrawable, user.lockedCapital, percentage + '%');
-      await addTransaction(user.id, 'performance', `Monthly profit — ${program} ${percentage}%`, profit, user.balance, newBalance);
+      // Calculate profit on locked capital (original investment), not total balance
+      const profit = Math.round(user.lockedCapital * rate * 100) / 100;
+      
+      // Determine if compounding or monthly withdrawal
+      const isCompounding = user.profitPref && (
+        user.profitPref.toLowerCase().includes('reinvest') || 
+        user.profitPref.toLowerCase().includes('compound')
+      );
+
+      let newBalance, newWithdrawable, newLockedCapital, desc;
+
+      if (isCompounding) {
+        // COMPOUNDING: profit adds to balance AND locked capital, withdrawable stays same
+        newBalance = user.balance + profit;
+        newWithdrawable = user.withdrawable; // no new withdrawable
+        newLockedCapital = user.lockedCapital + profit; // capital grows
+        desc = `Monthly profit — ${program} ${percentage}% (compounding → capital now $${newLockedCapital.toLocaleString()})`;
+      } else {
+        // MONTHLY WITHDRAWAL: profit adds to withdrawable only, capital stays same
+        newBalance = user.balance + profit;
+        newWithdrawable = user.withdrawable + profit;
+        newLockedCapital = user.lockedCapital; // capital unchanged
+        desc = `Monthly profit — ${program} ${percentage}% (withdrawable +$${profit.toLocaleString()})`;
+      }
+
+      await updateUserBalance(user.id, newBalance, newWithdrawable, newLockedCapital, percentage + '%');
+      await addTransaction(user.id, 'performance', desc, profit, user.balance, newBalance);
       totalProfit += profit;
+      details.push({ name: user.name, profit, mode: isCompounding ? 'compound' : 'withdraw' });
     }
 
     await addProfitBatch(program, Number(percentage), eligible.length, totalProfit, note, auth.username || 'Admin');

@@ -168,9 +168,32 @@ export default function AdminPage() {
               <div className="field full"><label>Note</label><input value={profitForm.note} onChange={e => setProfitForm({...profitForm,note:e.target.value})} placeholder="e.g. May 2026 monthly allocation" /></div>
             </div>
             <div className="notice" style={{marginBottom:16}}>
-              <strong>Preview:</strong> {eligibleForProfit.length} active {profitForm.program} clients will receive {profitForm.percentage}% profit.
-              Total: {usd(eligibleForProfit.reduce((s, c) => s + c.balance * Number(profitForm.percentage) / 100, 0))}
+              <strong>Preview:</strong> {eligibleForProfit.length} active {profitForm.program} client(s) will receive {profitForm.percentage}% profit on their locked capital.
+              <br/>Total estimated: {usd(eligibleForProfit.reduce((s, c) => s + (c.lockedCapital || c.balance) * Number(profitForm.percentage) / 100, 0))}
             </div>
+            {eligibleForProfit.length > 0 && (
+              <div className="table-wrap" style={{marginBottom:16}}>
+                <table>
+                  <thead><tr><th>Client</th><th>Locked Capital</th><th>Profit Pref</th><th>Estimated Profit</th><th>Effect</th></tr></thead>
+                  <tbody>
+                    {eligibleForProfit.map(c => {
+                      const capital = c.lockedCapital || c.balance;
+                      const profit = Math.round(capital * Number(profitForm.percentage) / 100 * 100) / 100;
+                      const isCompound = c.profitPref && (c.profitPref.toLowerCase().includes('reinvest') || c.profitPref.toLowerCase().includes('compound'));
+                      return (
+                        <tr key={c.id}>
+                          <td><strong>{c.name}</strong></td>
+                          <td>{usd(capital)}</td>
+                          <td><span className="tag" style={{fontSize:11,color: isCompound ? 'var(--blue)' : 'var(--green)', background: isCompound ? 'rgba(133,183,255,.09)' : 'rgba(123,216,143,.08)'}}>{isCompound ? 'Compounding' : 'Monthly Withdrawal'}</span></td>
+                          <td style={{fontWeight:700,color:'var(--green)'}}>+{usd(profit)}</td>
+                          <td style={{fontSize:12}}>{isCompound ? 'Adds to capital → new capital ' + usd(capital + profit) : 'Adds to withdrawable'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
             <button className="btn btn-primary" onClick={() => setShowProfitModal(true)} disabled={eligibleForProfit.length===0}>Post Profit to All Eligible Clients</button>
           </div>
         )}
