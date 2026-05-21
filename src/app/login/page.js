@@ -38,8 +38,8 @@ export default function LoginPage() {
   return (
     <div>
       <nav className="site-nav"><div className="container nav-inner"><a className="brand" href="/"><span className="brand-mark">A</span><span>AurumYield</span></a></div></nav>
-      <main style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',padding:'80px 20px'}}>
-        <div className="panel" style={{width:440,padding:36}}>
+      <main style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',padding:'80px 16px'}}>
+        <div className="panel" style={{width:'100%',maxWidth:440,padding:'clamp(24px,4vw,36px)'}}>
           <div style={{textAlign:'center',marginBottom:24}}>
             <div className="brand-mark" style={{width:52,height:52,fontSize:22,margin:'0 auto 16px'}}>A</div>
             <h2 style={{fontSize:24,fontWeight:800}}>Sign In</h2>

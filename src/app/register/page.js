@@ -36,10 +36,10 @@ export default function RegisterPage() {
         <a className="btn btn-secondary" href="/">Back to Website</a>
       </div></nav>
 
-      <main style={{padding:'100px 0 60px'}}>
-        <div className="container" style={{display:'grid',gridTemplateColumns:'.9fr 1.1fr',gap:34,alignItems:'start'}}>
+      <main style={{padding:'clamp(60px,10vw,100px) 0 60px'}}>
+        <div className="container reg-grid">
           {/* LEFT SIDE */}
-          <aside className="panel" style={{padding:28,position:'sticky',top:102}}>
+          <aside className="panel reg-aside" style={{padding:'clamp(20px,3vw,28px)'}}>
             <div className="eyebrow">OPEN GOLD ACCOUNT</div>
             <h1 style={{fontSize:'clamp(36px,4.5vw,56px)',lineHeight:1,letterSpacing:-2,margin:'18px 0 20px'}}>
               Start your <span className="gold">digital gold</span> journey.
@@ -64,7 +64,7 @@ export default function RegisterPage() {
           </aside>
 
           {/* RIGHT FORM */}
-          <section className="panel" style={{padding:30}}>
+          <section className="panel" style={{padding:'clamp(20px,3vw,30px)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:26,gap:18,flexWrap:'wrap'}}>
               <div>
                 <div className="eyebrow">INVESTOR REGISTRATION</div>

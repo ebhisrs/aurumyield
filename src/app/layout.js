@@ -3,6 +3,7 @@ import './globals.css';
 export const metadata = {
   title: 'AurumYield — Digital Gold Investment',
   description: 'Professional gold investment platform',
+  viewport: 'width=device-width, initial-scale=1',
 };
 
 export default function RootLayout({ children }) {
