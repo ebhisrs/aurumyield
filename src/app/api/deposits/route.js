@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
-import { getDeposits, createDeposit, getDepositById, updateDepositStatus, getUserById, updateUserBalance, updateUserStatus, addTransaction, addAudit } from '../lib/data.js';
+import { getDeposits, createDeposit, getDepositById, updateDepositStatus, updateDeposit, deleteDeposit, getUserById, updateUserBalance, updateUserStatus, addTransaction, addAudit } from '../lib/data.js';
 import pg from 'pg';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'aurumyield-dev-secret';
@@ -71,6 +71,12 @@ export async function POST(request) {
       } else if (data.action === 'reject') {
         await updateDepositStatus(dep.id, 'rejected');
         await addAudit(`Rejected deposit ${dep.ref} for ${user?.name}`, auth.username || 'Admin');
+      } else if (data.action === 'edit') {
+        await updateDeposit(dep.id, data);
+        await addAudit(`Admin edited deposit ${dep.ref}: ${JSON.stringify(data).slice(0,100)}`, auth.username || 'Admin');
+      } else if (data.action === 'delete') {
+        await deleteDeposit(dep.id);
+        await addAudit(`Admin deleted deposit ${dep.ref} (${user?.name}, $${dep.amount})`, auth.username || 'Admin');
       }
       return NextResponse.json({ ok: true });
     }

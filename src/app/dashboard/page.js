@@ -432,9 +432,9 @@ export default function DashboardPage() {
         {/* WITHDRAWAL FORM */}
         {(tab === 'overview' || tab === 'withdrawal') && (
           <div className="card" style={{padding:24,marginTop:18}}>
-            <div style={{marginBottom:18}}><span className="eyebrow">WITHDRAWAL</span><h2 style={{fontSize:22,fontWeight:800,marginTop:8}}>Request Withdrawal</h2><p className="muted" style={{fontSize:13}}>Withdraw from available profit balance. Available: {usd(user.withdrawable)}</p></div>
+            <div style={{marginBottom:18}}><span className="eyebrow">WITHDRAWAL</span><h2 style={{fontSize:22,fontWeight:800,marginTop:8}}>Request Withdrawal</h2><p className="muted" style={{fontSize:13}}>Available balance: {usd(user.balance)}</p></div>
             <form onSubmit={submitWithdrawal} className="fields">
-              <div className="field"><label>Amount</label><input required type="number" min="100" max={user.withdrawable} value={wdForm.amount} onChange={e => setWdForm({...wdForm,amount:e.target.value})} placeholder="Amount" /></div>
+              <div className="field"><label>Amount</label><input required type="number" min="100" max={user.balance} value={wdForm.amount} onChange={e => setWdForm({...wdForm,amount:e.target.value})} placeholder="Amount" /></div>
               <div className="field"><label>Withdraw From</label><select value={wdForm.source} onChange={e => setWdForm({...wdForm,source:e.target.value})}><option>Available Profit Balance</option><option>Total Account Balance</option></select></div>
               <div className="field"><label>Method</label><select value={wdForm.method} onChange={e => setWdForm({...wdForm,method:e.target.value})}><option>Bank Transfer</option><option>Crypto Wallet</option></select></div>
               <div className="field"><label>Destination</label><input required value={wdForm.destination} onChange={e => setWdForm({...wdForm,destination:e.target.value})} placeholder="IBAN / Wallet address" /></div>

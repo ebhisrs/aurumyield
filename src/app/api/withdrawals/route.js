@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
-import { getWithdrawals, createWithdrawal, getWithdrawalById, updateWithdrawalStatus, getUserById, updateUserBalance, addTransaction, addAudit } from '../lib/data.js';
+import { getWithdrawals, createWithdrawal, getWithdrawalById, updateWithdrawalStatus, updateWithdrawal, deleteWithdrawal, getUserById, updateUserBalance, addTransaction, addAudit } from '../lib/data.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'aurumyield-dev-secret';
 
@@ -34,16 +34,31 @@ export async function POST(request) {
 
       if (data.action === 'approve') {
         if (!user || user.status !== 'approved') return NextResponse.json({ error: 'Client not active' }, { status: 400 });
-        if (w.amount > user.withdrawable || w.amount > user.balance) return NextResponse.json({ error: 'Insufficient balance' }, { status: 400 });
+        if (w.amount > user.balance) return NextResponse.json({ error: 'Insufficient balance' }, { status: 400 });
         await updateWithdrawalStatus(w.id, 'approved');
         const newBalance = user.balance - w.amount;
-        const newWithdrawable = user.withdrawable - w.amount;
-        await updateUserBalance(user.id, newBalance, newWithdrawable, user.lockedCapital, user.lastProfit);
+        // Deduct from withdrawable first, then locked capital
+        let newWithdrawable = user.withdrawable;
+        let newLocked = user.lockedCapital;
+        if (w.amount <= user.withdrawable) {
+          newWithdrawable = user.withdrawable - w.amount;
+        } else {
+          const remainder = w.amount - user.withdrawable;
+          newWithdrawable = 0;
+          newLocked = Math.max(0, user.lockedCapital - remainder);
+        }
+        await updateUserBalance(user.id, newBalance, newWithdrawable, newLocked, user.lastProfit);
         await addTransaction(user.id, 'withdrawal', 'Withdrawal approved', -w.amount, user.balance, newBalance);
         await addAudit(`Approved withdrawal for ${user.name}; -$${w.amount.toLocaleString()}`, auth.username || 'Admin');
       } else if (data.action === 'reject') {
         await updateWithdrawalStatus(w.id, 'rejected');
         await addAudit(`Rejected withdrawal for ${user?.name}`, auth.username || 'Admin');
+      } else if (data.action === 'edit') {
+        await updateWithdrawal(w.id, data);
+        await addAudit(`Admin edited withdrawal #${w.id}: ${JSON.stringify(data).slice(0,100)}`, auth.username || 'Admin');
+      } else if (data.action === 'delete') {
+        await deleteWithdrawal(w.id);
+        await addAudit(`Admin deleted withdrawal #${w.id} (${user?.name}, $${w.amount})`, auth.username || 'Admin');
       }
       return NextResponse.json({ ok: true });
     }
@@ -51,8 +66,8 @@ export async function POST(request) {
     if (auth.role === 'client') {
       const user = await getUserById(auth.userId);
       if (!user || user.status !== 'approved') return NextResponse.json({ error: 'Account not active' }, { status: 403 });
-      if (Number(data.amount) > user.withdrawable) return NextResponse.json({ error: 'Insufficient withdrawable balance' }, { status: 400 });
-      await createWithdrawal(auth.userId, Number(data.amount), data.source || 'Available Profit Balance', data.method || 'Bank Transfer', data.destination || '');
+      if (Number(data.amount) > user.balance) return NextResponse.json({ error: 'Insufficient balance' }, { status: 400 });
+      await createWithdrawal(auth.userId, Number(data.amount), data.source || 'Available Balance', data.method || 'Bank Transfer', data.destination || '');
       await addAudit(`New withdrawal request from ${user.name}: $${data.amount}`, 'System');
       return NextResponse.json({ ok: true });
     }

@@ -241,6 +241,36 @@ export async function updateUserStatus(id, status) {
   await query('UPDATE users SET status = $1 WHERE id = $2', [status, id]);
 }
 
+export async function updateUserProfile(id, data) {
+  const fields = [];
+  const vals = [];
+  let idx = 1;
+  if (data.name !== undefined) { fields.push(`name = $${idx++}`); vals.push(data.name); }
+  if (data.email !== undefined) { fields.push(`email = $${idx++}`); vals.push(data.email); }
+  if (data.phone !== undefined) { fields.push(`phone = $${idx++}`); vals.push(data.phone); }
+  if (data.country !== undefined) { fields.push(`country = $${idx++}`); vals.push(data.country); }
+  if (data.program !== undefined) { fields.push(`program = $${idx++}`); vals.push(data.program); }
+  if (data.profitPref !== undefined) { fields.push(`profit_pref = $${idx++}`); vals.push(data.profitPref); }
+  if (data.status !== undefined) { fields.push(`status = $${idx++}`); vals.push(data.status); }
+  if (data.balance !== undefined) { fields.push(`balance = $${idx++}`); vals.push(data.balance); }
+  if (data.withdrawable !== undefined) { fields.push(`withdrawable = $${idx++}`); vals.push(data.withdrawable); }
+  if (data.lockedCapital !== undefined) { fields.push(`locked_capital = $${idx++}`); vals.push(data.lockedCapital); }
+  if (data.newPassword) {
+    const hash = bcrypt.hashSync(data.newPassword, 10);
+    fields.push(`password = $${idx++}`); vals.push(hash);
+  }
+  if (fields.length === 0) return;
+  vals.push(id);
+  await query(`UPDATE users SET ${fields.join(', ')} WHERE id = $${idx}`, vals);
+}
+
+export async function deleteUser(id) {
+  await query('DELETE FROM transactions WHERE user_id = $1', [id]);
+  await query('DELETE FROM deposits WHERE user_id = $1', [id]);
+  await query('DELETE FROM withdrawals WHERE user_id = $1', [id]);
+  await query('DELETE FROM users WHERE id = $1', [id]);
+}
+
 export async function updateUserBalance(id, balance, withdrawable, lockedCapital, lastProfit) {
   await query('UPDATE users SET balance = $1, withdrawable = $2, locked_capital = $3, last_profit = $4 WHERE id = $5',
     [balance, withdrawable, lockedCapital, lastProfit || '-', id]);
@@ -277,6 +307,21 @@ export async function getDepositById(id) {
   return rows[0] ? mapDeposit(rows[0]) : null;
 }
 
+export async function updateDeposit(id, data) {
+  const fields = []; const vals = []; let idx = 1;
+  if (data.amount !== undefined) { fields.push(`amount = $${idx++}`); vals.push(data.amount); }
+  if (data.status !== undefined) { fields.push(`status = $${idx++}`); vals.push(data.status); }
+  if (data.method !== undefined) { fields.push(`method = $${idx++}`); vals.push(data.method); }
+  if (data.currency !== undefined) { fields.push(`currency = $${idx++}`); vals.push(data.currency); }
+  if (fields.length === 0) return;
+  vals.push(id);
+  await query(`UPDATE deposits SET ${fields.join(', ')} WHERE id = $${idx}`, vals);
+}
+
+export async function deleteDeposit(id) {
+  await query('DELETE FROM deposits WHERE id = $1', [id]);
+}
+
 // ─── WITHDRAWALS ──────────────────────────────────────────
 function mapWithdrawal(r) {
   return { id: r.id, userId: r.user_id, amount: Number(r.amount), source: r.source, method: r.method, destination: r.destination, status: r.status, date: r.created_at };
@@ -304,6 +349,21 @@ export async function updateWithdrawalStatus(id, status) {
 export async function getWithdrawalById(id) {
   const { rows } = await query('SELECT * FROM withdrawals WHERE id = $1', [id]);
   return rows[0] ? mapWithdrawal(rows[0]) : null;
+}
+
+export async function updateWithdrawal(id, data) {
+  const fields = []; const vals = []; let idx = 1;
+  if (data.amount !== undefined) { fields.push(`amount = $${idx++}`); vals.push(data.amount); }
+  if (data.status !== undefined) { fields.push(`status = $${idx++}`); vals.push(data.status); }
+  if (data.method !== undefined) { fields.push(`method = $${idx++}`); vals.push(data.method); }
+  if (data.destination !== undefined) { fields.push(`destination = $${idx++}`); vals.push(data.destination); }
+  if (fields.length === 0) return;
+  vals.push(id);
+  await query(`UPDATE withdrawals SET ${fields.join(', ')} WHERE id = $${idx}`, vals);
+}
+
+export async function deleteWithdrawal(id) {
+  await query('DELETE FROM withdrawals WHERE id = $1', [id]);
 }
 
 // ─── TRANSACTIONS ─────────────────────────────────────────
