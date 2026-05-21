@@ -129,6 +129,69 @@ export default function DashboardPage() {
     return true;
   });
 
+  const exportPDF = async (txList, usr) => {
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      await import('jspdf-autotable');
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text('AurumYield — Transaction Report', 14, 22);
+      doc.setFontSize(11);
+      doc.setTextColor(120);
+      doc.text(`Client: ${usr.name} | Account: AY-${String(usr.id).padStart(5,'0')}`, 14, 32);
+      doc.text(`Generated: ${new Date().toLocaleDateString()} | Period: ${reportFrom || 'All'} to ${reportTo || 'All'} | Type: ${reportType}`, 14, 39);
+      doc.setTextColor(0);
+      const rows = txList.map(t => [
+        t.date || '', t.type || '', t.desc || '',
+        (t.amount >= 0 ? '+' : '') + usd(Math.abs(t.amount)),
+        t.balanceBefore != null ? usd(t.balanceBefore) : '-',
+        t.balanceAfter != null ? usd(t.balanceAfter) : '-',
+        t.status || ''
+      ]);
+      doc.autoTable({
+        startY: 46,
+        head: [['Date','Type','Description','Amount','Before','After','Status']],
+        body: rows,
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [217,164,65] },
+      });
+      doc.save(`AurumYield_Report_${usr.name.replace(/\s/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (e) { console.error('PDF export error:', e); flash('PDF export failed', 'error'); }
+  };
+
+  const exportExcel = async (txList, usr) => {
+    try {
+      const XLSX = await import('xlsx');
+      const data = txList.map(t => ({
+        Date: t.date || '',
+        Type: t.type || '',
+        Description: t.desc || '',
+        Amount: t.amount || 0,
+        'Balance Before': t.balanceBefore || 0,
+        'Balance After': t.balanceAfter || 0,
+        Status: t.status || '',
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
+      // Add summary sheet
+      const summary = [
+        { Field: 'Client', Value: usr.name },
+        { Field: 'Account', Value: 'AY-' + String(usr.id).padStart(5,'0') },
+        { Field: 'Program', Value: usr.program },
+        { Field: 'Total Balance', Value: usr.balance },
+        { Field: 'Withdrawable', Value: usr.withdrawable },
+        { Field: 'Locked Capital', Value: usr.lockedCapital },
+        { Field: 'Report Period', Value: (reportFrom || 'All') + ' to ' + (reportTo || 'All') },
+        { Field: 'Filter', Value: reportType },
+        { Field: 'Generated', Value: new Date().toISOString() },
+      ];
+      const ws2 = XLSX.utils.json_to_sheet(summary);
+      XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+      XLSX.writeFile(wb, `AurumYield_Report_${usr.name.replace(/\s/g,'_')}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (e) { console.error('Excel export error:', e); flash('Excel export failed', 'error'); }
+  };
+
   const logout = () => { localStorage.clear(); window.location.href = '/login'; };
 
   if (!ready) return null;
@@ -408,24 +471,43 @@ export default function DashboardPage() {
         {/* REPORTS */}
         {(tab === 'overview' || tab === 'reports') && (
           <div className="card" style={{padding:24,marginTop:18}}>
-            <div style={{marginBottom:18}}><span className="eyebrow">HISTORICAL REPORT</span><h2 style={{fontSize:22,fontWeight:800,marginTop:8}}>Transaction History</h2></div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:18,flexWrap:'wrap',gap:12}}>
+              <div><span className="eyebrow">HISTORICAL REPORT</span><h2 style={{fontSize:22,fontWeight:800,marginTop:8}}>Transaction History</h2></div>
+              {tab === 'reports' && filteredTx.length > 0 && (
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  <button className="btn btn-small btn-secondary" onClick={() => exportPDF(filteredTx, user)}>Export PDF</button>
+                  <button className="btn btn-small btn-secondary" onClick={() => exportExcel(filteredTx, user)}>Export Excel</button>
+                </div>
+              )}
+            </div>
             <div className="fields" style={{marginBottom:18}}>
               <div className="field"><label>From Date</label><input type="date" value={reportFrom} onChange={e => setReportFrom(e.target.value)} /></div>
               <div className="field"><label>To Date</label><input type="date" value={reportTo} onChange={e => setReportTo(e.target.value)} /></div>
-              <div className="field"><label>Type</label><select value={reportType} onChange={e => setReportType(e.target.value)}><option value="all">All Activity</option><option value="performance">Performance</option><option value="deposit">Deposits</option><option value="withdrawal">Withdrawals</option></select></div>
+              <div className="field"><label>Type</label><select value={reportType} onChange={e => setReportType(e.target.value)}><option value="all">All Activity</option><option value="performance">Performance</option><option value="deposit">Deposits</option><option value="withdrawal">Withdrawals</option><option value="adjustment">Admin Adjustments</option></select></div>
             </div>
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
+                <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Balance Before</th><th>Balance After</th><th>Status</th></tr></thead>
                 <tbody>
                   {filteredTx.length === 0 ? (
-                    <tr><td colSpan={5} style={{textAlign:'center',color:'var(--muted)'}}>No transactions found</td></tr>
+                    <tr><td colSpan={7} style={{textAlign:'center',color:'var(--muted)'}}>No transactions found</td></tr>
                   ) : filteredTx.map(t => (
-                    <tr key={t.id}><td>{t.date}</td><td style={{textTransform:'capitalize'}}>{t.type}</td><td>{t.desc}</td><td style={{color: t.amount >= 0 ? 'var(--green)' : 'var(--red)', fontWeight:700}}>{t.amount >= 0 ? '+' : ''}{usd(Math.abs(t.amount))}</td><td><span className={'tag ' + t.status.toLowerCase()}>{t.status}</span></td></tr>
+                    <tr key={t.id}>
+                      <td>{t.date}</td>
+                      <td style={{textTransform:'capitalize'}}>{t.type}</td>
+                      <td>{t.desc}</td>
+                      <td style={{color: t.amount >= 0 ? 'var(--green)' : 'var(--red)', fontWeight:700}}>{t.amount >= 0 ? '+' : ''}{usd(Math.abs(t.amount))}</td>
+                      <td className="muted">{t.balanceBefore != null ? usd(t.balanceBefore) : '-'}</td>
+                      <td style={{fontWeight:600}}>{t.balanceAfter != null ? usd(t.balanceAfter) : '-'}</td>
+                      <td><span className={'tag ' + (t.status || '').toLowerCase()}>{t.status}</span></td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            {filteredTx.length > 0 && (
+              <p className="muted" style={{fontSize:12,marginTop:14}}>Showing {filteredTx.length} transaction(s). {reportFrom || reportTo ? 'Filtered by date range.' : ''}</p>
+            )}
           </div>
         )}
 
