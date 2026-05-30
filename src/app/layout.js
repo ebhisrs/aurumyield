@@ -1,7 +1,7 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'AurumYield — Digital Gold Investment',
+  title: '8QMM Gold — Backed by Gold. Built for Growth',
   description: 'Professional gold investment platform',
   viewport: 'width=device-width, initial-scale=1',
 };

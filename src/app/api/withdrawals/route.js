@@ -37,19 +37,26 @@ export async function POST(request) {
         if (w.amount > user.balance) return NextResponse.json({ error: 'Insufficient balance' }, { status: 400 });
         await updateWithdrawalStatus(w.id, 'approved');
         const newBalance = user.balance - w.amount;
-        // Deduct from withdrawable first, then locked capital
+        // Deduct from available profit first, then from locked capital
         let newWithdrawable = user.withdrawable;
         let newLocked = user.lockedCapital;
+        let fromProfit = 0;
+        let fromCapital = 0;
         if (w.amount <= user.withdrawable) {
+          fromProfit = w.amount;
           newWithdrawable = user.withdrawable - w.amount;
         } else {
-          const remainder = w.amount - user.withdrawable;
+          fromProfit = user.withdrawable;
+          fromCapital = w.amount - user.withdrawable;
           newWithdrawable = 0;
-          newLocked = Math.max(0, user.lockedCapital - remainder);
+          newLocked = Math.max(0, user.lockedCapital - fromCapital);
         }
         await updateUserBalance(user.id, newBalance, newWithdrawable, newLocked, user.lastProfit);
-        await addTransaction(user.id, 'withdrawal', 'Withdrawal approved', -w.amount, user.balance, newBalance);
-        await addAudit(`Approved withdrawal for ${user.name}; -$${w.amount.toLocaleString()}`, auth.username || 'Admin');
+        const desc = fromCapital > 0
+          ? `Withdrawal approved — $${fromProfit.toLocaleString()} from profit + $${fromCapital.toLocaleString()} from capital`
+          : `Withdrawal approved — $${fromProfit.toLocaleString()} from available profit`;
+        await addTransaction(user.id, 'withdrawal', desc, -w.amount, user.balance, newBalance);
+        await addAudit(`Approved withdrawal for ${user.name}; -$${w.amount.toLocaleString()} (profit: $${fromProfit}, capital: $${fromCapital})`, auth.username || 'Admin');
       } else if (data.action === 'reject') {
         await updateWithdrawalStatus(w.id, 'rejected');
         await addAudit(`Rejected withdrawal for ${user?.name}`, auth.username || 'Admin');

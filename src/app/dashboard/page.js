@@ -135,7 +135,7 @@ export default function DashboardPage() {
       await import('jspdf-autotable');
       const doc = new jsPDF();
       doc.setFontSize(18);
-      doc.text('AurumYield — Transaction Report', 14, 22);
+      doc.text('8QMM Gold — Transaction Report', 14, 22);
       doc.setFontSize(11);
       doc.setTextColor(120);
       doc.text(`Client: ${usr.name} | Account: AY-${String(usr.id).padStart(5,'0')}`, 14, 32);
@@ -155,7 +155,7 @@ export default function DashboardPage() {
         styles: { fontSize: 9 },
         headStyles: { fillColor: [217,164,65] },
       });
-      doc.save(`AurumYield_Report_${usr.name.replace(/\s/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+      doc.save(`8QMM Gold_Report_${usr.name.replace(/\s/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (e) { console.error('PDF export error:', e); flash('PDF export failed', 'error'); }
   };
 
@@ -188,7 +188,7 @@ export default function DashboardPage() {
       ];
       const ws2 = XLSX.utils.json_to_sheet(summary);
       XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
-      XLSX.writeFile(wb, `AurumYield_Report_${usr.name.replace(/\s/g,'_')}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      XLSX.writeFile(wb, `8QMM Gold_Report_${usr.name.replace(/\s/g,'_')}_${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch (e) { console.error('Excel export error:', e); flash('Excel export failed', 'error'); }
   };
 
@@ -215,7 +215,7 @@ export default function DashboardPage() {
     return (
       <div className="app-layout">
         <aside className="app-sidebar">
-          <a className="brand" href="/"><span className="brand-mark">A</span><span>AurumYield</span></a>
+          <a className="brand" href="/"><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:42,height:42,borderRadius:"50%",objectFit:"cover"}} /><span>8QMM Gold</span></a>
           <nav className="sidebar-nav">
             <a className="active" style={{cursor:'pointer'}}>Account Status</a>
             <a onClick={() => setTab('kyc')} className={tab === 'kyc' ? 'active' : ''} style={{cursor:'pointer'}}>KYC Documents</a>
@@ -319,7 +319,7 @@ export default function DashboardPage() {
     return (
       <div className="app-layout">
         <aside className="app-sidebar">
-          <a className="brand" href="/"><span className="brand-mark">A</span><span>AurumYield</span></a>
+          <a className="brand" href="/"><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:42,height:42,borderRadius:"50%",objectFit:"cover"}} /><span>8QMM Gold</span></a>
         </aside>
         <main className="app-main">
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:20,marginBottom:28}}>
@@ -342,7 +342,7 @@ export default function DashboardPage() {
   return (
     <div className="app-layout">
       <aside className="app-sidebar">
-        <a className="brand" href="/"><span className="brand-mark">A</span><span>AurumYield</span></a>
+        <a className="brand" href="/"><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:42,height:42,borderRadius:"50%",objectFit:"cover"}} /><span>8QMM Gold</span></a>
         <nav className="sidebar-nav">
           {['overview','deposit','withdrawal','reports','kyc'].map(t => (
             <a key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)} style={{cursor:'pointer',textTransform:'capitalize'}}>{t === 'kyc' ? 'KYC Documents' : t}</a>

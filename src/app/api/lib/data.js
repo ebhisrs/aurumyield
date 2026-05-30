@@ -130,7 +130,7 @@ export async function initDB() {
   const settCheck = await query('SELECT key FROM settings LIMIT 1');
   if (settCheck.rows.length === 0) {
     const defaults = {
-      platformName: 'AurumYield', minDeposit: '1000', maxWithdrawalPercent: '100',
+      platformName: '8QMM Gold', minDeposit: '1000', maxWithdrawalPercent: '100',
       conservativeTarget: '4', growthTarget: '8', kycRequired: 'true',
       autoApproveDeposits: 'false', autoApproveWithdrawals: 'false',
       maintenanceMode: 'false',

@@ -14,7 +14,7 @@ export default function Home() {
       {/* NAV */}
       <nav className="hp-nav">
         <div className="container hp-nav-inner">
-          <a href="/" className="hp-brand"><span className="hp-brand-mark">A</span><span>AurumYield</span></a>
+          <a href="/" className="hp-brand"><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:42,height:42,borderRadius:"50%",objectFit:"cover"}} /><span>8QMM Gold</span></a>
           <div className="hp-nav-links">
             <a href="#idea">The Idea</a>
             <a href="#programs">Programs</a>
@@ -73,7 +73,7 @@ export default function Home() {
           <div className="hp-section-head">
             <div className="hp-kicker">The Platform Idea</div>
             <h2 className="hp-h2">Gold should do more than sit in a vault.</h2>
-            <p className="muted">AurumYield brings together three powerful investment concepts into one user-friendly experience: digital gold ownership, yield generation on precious metals, and luxury monthly-income positioning.</p>
+            <p className="muted">8QMM Gold brings together three powerful investment concepts into one user-friendly experience: digital gold ownership, yield generation on precious metals, and luxury monthly-income positioning.</p>
           </div>
           <div className="hp-cards-4">
             {[{n:'01',t:'Digital Gold Ownership',d:'Buy and monitor gold exposure digitally without storage hassle, shipping concerns, or large entry barriers.'},{n:'02',t:'Precious Metals Yield',d:'Access professionally managed gold and silver strategies designed to seek monthly performance opportunities.'},{n:'03',t:'Compounded Interest Option',d:'Instead of withdrawing monthly profit, investors can reinvest positive performance so the next month starts from a larger balance.'},{n:'04',t:'Luxury Wealth Experience',d:'A premium investor journey with clear onboarding, transparent reports, dedicated support, and long-term growth positioning.'}].map(c => (
@@ -245,7 +245,7 @@ export default function Home() {
       {/* FOOTER */}
       <footer className="hp-footer">
         <div className="container hp-footer-inner">
-          <div>© 2026 AurumYield. Digital Gold Wealth Platform.</div>
+          <div>© 2026 8QMM Gold. Digital Gold Wealth Platform.</div>
           <div>Risk Disclosure • Terms • Privacy • Compliance</div>
         </div>
       </footer>
