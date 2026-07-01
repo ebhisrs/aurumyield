@@ -30,9 +30,9 @@ export default function LoginPage() {
   };
 
   const hints = {
-    client: { placeholder: 'name@email.com', hint: 'Demo: ahmed@example.com / client123' },
-    admin: { placeholder: 'admin', hint: 'Default: admin / admin123' },
-    superadmin: { placeholder: 'superadmin', hint: 'Default: superadmin / super123' },
+    client: { placeholder: 'name@email.com' },
+    admin: { placeholder: 'Username' },
+    superadmin: { placeholder: 'Username' },
   };
 
   return (
@@ -74,7 +74,6 @@ export default function LoginPage() {
 
           <div style={{textAlign:'center',marginTop:20}}>
             {tab === 'client' && <p className="muted" style={{fontSize:12}}>Don&apos;t have an account? <a href="/register" style={{color:'var(--gold2)'}}>Open Account</a></p>}
-            <p className="muted" style={{fontSize:11,marginTop:8}}>{hints[tab].hint}</p>
           </div>
         </div>
       </main>
