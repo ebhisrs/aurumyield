@@ -32,7 +32,7 @@ export default function RegisterPage() {
   return (
     <div>
       <nav className="site-nav"><div className="container nav-inner">
-        <a className="brand" href="/"><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:42,height:42,borderRadius:"50%",objectFit:"cover"}} /><span>8QMM Gold</span></a>
+        <a className="brand" href="/"><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:56,height:56,borderRadius:"50%",objectFit:"cover"}} /><span>8QMM Gold</span></a>
         <a className="btn btn-secondary" href="/">Back to Website</a>
       </div></nav>
 

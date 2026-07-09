@@ -215,7 +215,7 @@ export default function DashboardPage() {
     return (
       <div className="app-layout">
         <aside className="app-sidebar">
-          <a className="brand" href="/"><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:42,height:42,borderRadius:"50%",objectFit:"cover"}} /><span>8QMM Gold</span></a>
+          <a className="brand" href="/"><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:56,height:56,borderRadius:"50%",objectFit:"cover"}} /><span>8QMM Gold</span></a>
           <nav className="sidebar-nav">
             <a className="active" style={{cursor:'pointer'}}>Account Status</a>
             <a onClick={() => setTab('kyc')} className={tab === 'kyc' ? 'active' : ''} style={{cursor:'pointer'}}>KYC Documents</a>
@@ -319,7 +319,7 @@ export default function DashboardPage() {
     return (
       <div className="app-layout">
         <aside className="app-sidebar">
-          <a className="brand" href="/"><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:42,height:42,borderRadius:"50%",objectFit:"cover"}} /><span>8QMM Gold</span></a>
+          <a className="brand" href="/"><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:56,height:56,borderRadius:"50%",objectFit:"cover"}} /><span>8QMM Gold</span></a>
         </aside>
         <main className="app-main">
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:20,marginBottom:28}}>
@@ -342,7 +342,7 @@ export default function DashboardPage() {
   return (
     <div className="app-layout">
       <aside className="app-sidebar">
-        <a className="brand" href="/"><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:42,height:42,borderRadius:"50%",objectFit:"cover"}} /><span>8QMM Gold</span></a>
+        <a className="brand" href="/"><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:56,height:56,borderRadius:"50%",objectFit:"cover"}} /><span>8QMM Gold</span></a>
         <nav className="sidebar-nav">
           {['overview','deposit','withdrawal','reports','kyc'].map(t => (
             <a key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)} style={{cursor:'pointer',textTransform:'capitalize'}}>{t === 'kyc' ? 'KYC Documents' : t}</a>

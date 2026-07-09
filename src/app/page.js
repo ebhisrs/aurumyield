@@ -14,7 +14,7 @@ export default function Home() {
       {/* NAV */}
       <nav className="hp-nav">
         <div className="container hp-nav-inner">
-          <a href="/" className="hp-brand"><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:42,height:42,borderRadius:"50%",objectFit:"cover"}} /><span>8QMM Gold</span></a>
+          <a href="/" className="hp-brand"><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:56,height:56,borderRadius:"50%",objectFit:"cover"}} /><span>8QMM Gold</span></a>
           <div className="hp-nav-links">
             <a href="#idea">The Idea</a>
             <a href="#programs">Programs</a>
@@ -23,7 +23,10 @@ export default function Home() {
             <a href="#trust">Trust</a>
             <a href="#faq">FAQ</a>
           </div>
-          <a className="hp-btn hp-btn-primary" href="/register">Open Account</a>
+          <div style={{display:'flex',gap:10}}>
+            <a className="hp-btn hp-btn-secondary" href="/login">Sign In</a>
+            <a className="hp-btn hp-btn-primary" href="/register">Open Account</a>
+          </div>
         </div>
       </nav>
 

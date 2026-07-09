@@ -46,7 +46,7 @@ export default function LoginPage() {
       <main style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',padding:'80px 16px'}}>
         <div className="panel" style={{width:'100%',maxWidth:440,padding:'clamp(24px,4vw,36px)'}}>
           <div style={{textAlign:'center',marginBottom:24}}>
-            <img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:56,height:56,borderRadius:"50%",objectFit:"cover",margin:"0 auto 16px"}} />
+            <img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:68,height:68,borderRadius:"50%",objectFit:"cover",margin:"0 auto 16px"}} />
             <h2 style={{fontSize:24,fontWeight:800}}>Sign In</h2>
             <p className="muted" style={{fontSize:13,marginTop:6}}>Access your account</p>
           </div>

@@ -102,7 +102,7 @@ export default function AdminPage() {
   return (
     <div className="app-layout">
       <aside className="app-sidebar">
-        <div className="brand" style={{marginBottom:34}}><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:42,height:42,borderRadius:"50%",objectFit:"cover"}} /><div><span style={{fontWeight:900,fontSize:18}}>8QMM Gold</span><small style={{display:'block',color:'var(--muted)',fontWeight:600,fontSize:12}}>Admin</small></div></div>
+        <div className="brand" style={{marginBottom:34}}><img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:56,height:56,borderRadius:"50%",objectFit:"cover"}} /><div><span style={{fontWeight:900,fontSize:18}}>8QMM Gold</span><small style={{display:'block',color:'var(--muted)',fontWeight:600,fontSize:12}}>Admin</small></div></div>
         <nav className="sidebar-nav">
           {navItems.map(t => <a key={t} className={tab===t?'active':''} onClick={()=>setTab(t)} style={{cursor:'pointer',textTransform:'capitalize',position:'relative'}}>{t==='profit'?'Post Profit':t==='kyc'?'KYC Review':t==='risk'?'Risk Alerts':t}{t==='kyc'&&pendingKyc.length>0&&<span style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'var(--gold)',color:'#111',borderRadius:'50%',width:20,height:20,display:'grid',placeItems:'center',fontSize:10,fontWeight:900}}>{pendingKyc.length}</span>}{t==='risk'&&riskAlerts.length>0&&<span style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'var(--red)',color:'#fff',borderRadius:'50%',width:20,height:20,display:'grid',placeItems:'center',fontSize:10,fontWeight:900}}>{riskAlerts.length}</span>}</a>)}
         </nav>

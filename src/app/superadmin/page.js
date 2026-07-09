@@ -117,7 +117,7 @@ export default function SuperAdminPage() {
     <div className="app-layout">
       <aside className="app-sidebar">
         <div className="brand" style={{marginBottom:34}}>
-          <img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:42,height:42,borderRadius:'50%',objectFit:'cover'}} />
+          <img src="/logo-dark.jpeg" alt="8QMM Gold" style={{width:56,height:56,borderRadius:'50%',objectFit:'cover'}} />
           <div><span style={{fontWeight:900,fontSize:18}}>8QMM Gold</span><small style={{display:'block',color:'#f07f7f',fontWeight:700,fontSize:12}}>Super Admin</small></div>
         </div>
         <nav className="sidebar-nav">
