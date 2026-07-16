@@ -146,13 +146,13 @@ export async function initDB() {
   if (userCheck.rows.length === 0) {
     const cp = bcrypt.hashSync('client123', 10);
     await query('INSERT INTO users (name, email, phone, country, password, status, program, profit_pref, balance, withdrawable, locked_capital, last_profit, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
-      ['Ahmed Al-Rashid', 'ahmed@example.com', '+971501234567', 'UAE', cp, 'approved', 'Conservative', 'Monthly income withdrawals', 12480, 1240, 10000, '3.2%', '2026-01-05']);
+      ['Ahmed Al-Rashid', 'ahmed@example.com', '+971501234567', 'UAE', cp, 'approved', 'Conservative', 'Monthly income withdrawals', 12480, 12480, 10000, '3.2%', '2026-01-05']);
     await query('INSERT INTO users (name, email, phone, country, password, status, program, profit_pref, balance, withdrawable, locked_capital, last_profit, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
-      ['Sara Mansour', 'sara@example.com', '+962791234567', 'Jordan', cp, 'approved', 'Growth', 'Reinvest profits quarterly', 28500, 2100, 25000, '5.8%', '2026-01-12']);
+      ['Sara Mansour', 'sara@example.com', '+962791234567', 'Jordan', cp, 'approved', 'Growth', 'Reinvest profits quarterly', 28500, 28500, 25000, '5.8%', '2026-01-12']);
     await query('INSERT INTO users (name, email, phone, country, password, status, program, profit_pref, balance, withdrawable, locked_capital, last_profit, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
       ['Khalid Nasser', 'khalid@example.com', '+966551234567', 'Saudi Arabia', cp, 'pending', 'Conservative', 'Monthly income withdrawals', 0, 0, 0, '-', '2026-05-10']);
     await query('INSERT INTO users (name, email, phone, country, password, status, program, profit_pref, balance, withdrawable, locked_capital, last_profit, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
-      ['Fatima Hassan', 'fatima@example.com', '+971509876543', 'UAE', cp, 'disabled', 'Growth', 'Reinvest profits annually', 5200, 0, 5000, '4.0%', '2025-11-20']);
+      ['Fatima Hassan', 'fatima@example.com', '+971509876543', 'UAE', cp, 'disabled', 'Growth', 'Reinvest profits annually', 5200, 5200, 5000, '4.0%', '2025-11-20']);
   }
 }
 

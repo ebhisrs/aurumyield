@@ -58,23 +58,22 @@ export async function POST(request) {
         user.profitPref.toLowerCase().includes('compound')
       );
 
-      let newBalance, newWithdrawable, newLockedCapital, desc;
+      let newBalance, newLockedCapital, desc;
 
       if (isCompounding) {
-        // COMPOUNDING: profit adds to balance AND locked capital, withdrawable stays same
+        // COMPOUNDING: profit adds to balance AND locked capital
         newBalance = user.balance + profit;
-        newWithdrawable = user.withdrawable; // no new withdrawable
-        newLockedCapital = user.lockedCapital + profit; // capital grows
+        newLockedCapital = user.lockedCapital + profit;
         desc = `Monthly profit — ${program} ${percentage}% (compounding → capital now $${newLockedCapital.toLocaleString()})`;
       } else {
-        // MONTHLY WITHDRAWAL: profit adds to withdrawable only, capital stays same
+        // MONTHLY WITHDRAWAL: profit adds to balance, capital stays same
         newBalance = user.balance + profit;
-        newWithdrawable = user.withdrawable + profit;
-        newLockedCapital = user.lockedCapital; // capital unchanged
-        desc = `Monthly profit — ${program} ${percentage}% (withdrawable +$${profit.toLocaleString()})`;
+        newLockedCapital = user.lockedCapital;
+        desc = `Monthly profit — ${program} ${percentage}% (+$${profit.toLocaleString()})`;
       }
 
-      await updateUserBalance(user.id, newBalance, newWithdrawable, newLockedCapital, percentage + '%');
+      // Withdrawable always equals balance
+      await updateUserBalance(user.id, newBalance, newBalance, newLockedCapital, percentage + '%');
       await addTransaction(user.id, 'performance', desc, profit, user.balance, newBalance);
       totalProfit += profit;
       details.push({ name: user.name, profit, mode: isCompounding ? 'compound' : 'withdraw' });

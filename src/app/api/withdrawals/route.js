@@ -37,26 +37,18 @@ export async function POST(request) {
         if (w.amount > user.balance) return NextResponse.json({ error: 'Insufficient balance' }, { status: 400 });
         await updateWithdrawalStatus(w.id, 'approved');
         const newBalance = user.balance - w.amount;
-        // Deduct from available profit first, then from locked capital
-        let newWithdrawable = user.withdrawable;
+        // Deduct from locked capital if withdrawal exceeds profit portion
         let newLocked = user.lockedCapital;
-        let fromProfit = 0;
-        let fromCapital = 0;
-        if (w.amount <= user.withdrawable) {
-          fromProfit = w.amount;
-          newWithdrawable = user.withdrawable - w.amount;
-        } else {
-          fromProfit = user.withdrawable;
-          fromCapital = w.amount - user.withdrawable;
-          newWithdrawable = 0;
+        const profitPortion = user.balance - user.lockedCapital;
+        if (w.amount > profitPortion) {
+          const fromCapital = w.amount - Math.max(0, profitPortion);
           newLocked = Math.max(0, user.lockedCapital - fromCapital);
         }
-        await updateUserBalance(user.id, newBalance, newWithdrawable, newLocked, user.lastProfit);
-        const desc = fromCapital > 0
-          ? `Withdrawal approved — $${fromProfit.toLocaleString()} from profit + $${fromCapital.toLocaleString()} from capital`
-          : `Withdrawal approved — $${fromProfit.toLocaleString()} from available profit`;
+        // Withdrawable always equals balance
+        await updateUserBalance(user.id, newBalance, newBalance, newLocked, user.lastProfit);
+        const desc = `Withdrawal approved — $${w.amount.toLocaleString()}`;
         await addTransaction(user.id, 'withdrawal', desc, -w.amount, user.balance, newBalance);
-        await addAudit(`Approved withdrawal for ${user.name}; -$${w.amount.toLocaleString()} (profit: $${fromProfit}, capital: $${fromCapital})`, auth.username || 'Admin');
+        await addAudit(`Approved withdrawal for ${user.name}; -$${w.amount.toLocaleString()}`, auth.username || 'Admin');
       } else if (data.action === 'reject') {
         await updateWithdrawalStatus(w.id, 'rejected');
         await addAudit(`Rejected withdrawal for ${user?.name}`, auth.username || 'Admin');

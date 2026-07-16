@@ -63,7 +63,7 @@ export async function POST(request) {
         if (user) {
           const newBalance = user.balance + dep.amount;
           const newLocked = user.lockedCapital + dep.amount;
-          await updateUserBalance(user.id, newBalance, user.withdrawable, newLocked, user.lastProfit);
+          await updateUserBalance(user.id, newBalance, newBalance, newLocked, user.lastProfit);
           if (user.status === 'pending') await updateUserStatus(user.id, 'approved');
           await addTransaction(user.id, 'deposit', `Deposit approved — ${dep.ref}`, dep.amount, user.balance, newBalance);
         }
